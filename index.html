@@ -1299,6 +1299,73 @@ document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible') loadBalance();
 });
 
+/* ---------------- ПРОМОКОДЫ ---------------- */
+const PROMO_ERROR_MESSAGES = {
+  MISSING_PARAMS: 'Введите промокод',
+  INVALID_INIT_DATA: 'Не удалось подтвердить пользователя Telegram',
+  PROFILE_NOT_FOUND: 'Профиль не найден',
+  PROMO_NOT_FOUND: 'Промокод не найден',
+  PROMO_INACTIVE: 'Промокод больше не активен',
+  PROMO_EXPIRED: 'Срок действия промокода истёк',
+  PROMO_LIMIT_REACHED: 'Промокод исчерпан',
+  PROMO_ALREADY_USED: 'Вы уже использовали этот промокод',
+  SERVER_ERROR: 'Ошибка сервера. Попробуйте позже'
+};
+
+async function applyPromoCode(){
+  const input = document.getElementById('promoInput');
+  const btn = document.getElementById('btnPromoApply');
+  const code = input.value.trim();
+
+  if(!code){ showToast('Введите промокод'); return; }
+
+  if(!supabaseClient){
+    showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
+    return;
+  }
+
+  const initData = getTelegramInitData();
+  if(!initData){
+    showToast('Откройте приложение через Telegram-бота, чтобы применить промокод');
+    return;
+  }
+
+  const prevText = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('redeem-promo', {
+      body: { code, init_data: initData }
+    });
+
+    if(error) throw error;
+
+    if(data?.error){
+      showToast(PROMO_ERROR_MESSAGES[data.error] || 'Не удалось применить промокод');
+      return;
+    }
+
+    const credited = Number(data?.credited);
+    const newBalance = Number(data?.balance);
+
+    if(!Number.isNaN(newBalance)){
+      state.balance = newBalance;
+      renderBalance();
+    }
+
+    input.value = '';
+    showToast(!Number.isNaN(credited) ? `Баланс пополнен на ${rub(credited)}` : 'Промокод применён');
+
+  } catch(e){
+    console.error('redeem-promo error:', e);
+    showToast('Не удалось применить промокод. Попробуйте ещё раз');
+  } finally {
+    btn.textContent = prevText;
+    btn.disabled = false;
+  }
+}
+
 function openTopup(){
   state.topupAmount = null;
   document.getElementById('topupCustom').value = '';
@@ -1432,11 +1499,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Промокод
-  document.getElementById('btnPromoApply').addEventListener('click', () => {
-    const code = document.getElementById('promoInput').value.trim();
-    if (!code) { showToast('Введите промокод'); return; }
-    showToast('Промокод не найден');
-  });
+  document.getElementById('btnPromoApply').addEventListener('click', () => applyPromoCode());
 
   // Копировать реферальную ссылку
   document.getElementById('btnCopyRef').addEventListener('click', () => {
