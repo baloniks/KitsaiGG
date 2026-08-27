@@ -1314,9 +1314,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('userName').textContent = fullName || 'Пользователь';
         document.getElementById('userHandle').textContent = tgUser.username ? '@' + tgUser.username : '';
 
-        // Инициалы для аватара-заглушки
-        const initials = (tgUser.first_name?.[0] || '') + (tgUser.last_name?.[0] || '');
-        document.getElementById('userAvatar').textContent = initials.toUpperCase() || 'Ki';
+        const avatarEl = document.getElementById('userAvatar');
+        if (tgUser.photo_url) {
+          // Показываем фото профиля, если Telegram его прислал
+          avatarEl.style.backgroundImage = `url('${tgUser.photo_url}')`;
+          avatarEl.textContent = '';
+        } else {
+          // Фоллбэк на инициалы, если фото недоступно (частый случай на Desktop-клиенте)
+          const initials = (tgUser.first_name?.[0] || '') + (tgUser.last_name?.[0] || '');
+          avatarEl.textContent = initials.toUpperCase() || 'Ki';
+        }
       }
     } catch(e) {}
   }
