@@ -674,7 +674,6 @@
       <div class="field">
         <label>Опишите проблему</label>
         <textarea id="ticketMsg" rows="5" placeholder="Что произошло?" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-body); font-size:13.5px; outline:none; resize:vertical;"></textarea>
-        <div class="hint">Заявка придёт администратору в панель заказов, ответ — в этот чат и в Telegram.</div>
       </div>
       <button class="btn-primary" onclick="submitTicket()">Отправить тикет</button>
     </section>
@@ -1269,8 +1268,5 @@ renderOrders();
 document.getElementById('refCount').textContent = state.referral.count;
 document.getElementById('refEarned').textContent = rub(state.referral.earned);
 </script>
-
-<!-- Подключение логики кнопки админа -->
-<script src="admin-check.js"></script>
 </body>
 </html>
