@@ -1306,6 +1306,18 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
+
+      // Подставляем реальные данные пользователя из Telegram
+      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (tgUser) {
+        const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+        document.getElementById('userName').textContent = fullName || 'Пользователь';
+        document.getElementById('userHandle').textContent = tgUser.username ? '@' + tgUser.username : '';
+
+        // Инициалы для аватара-заглушки
+        const initials = (tgUser.first_name?.[0] || '') + (tgUser.last_name?.[0] || '');
+        document.getElementById('userAvatar').textContent = initials.toUpperCase() || 'Ki';
+      }
     } catch(e) {}
   }
 
