@@ -1319,11 +1319,6 @@ async function applyPromoCode(){
 
   if(!code){ showToast('Введите промокод'); return; }
 
-  if(!supabaseClient){
-    showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
-    return;
-  }
-
   const initData = getTelegramInitData();
   if(!initData){
     showToast('Откройте приложение через Telegram-бота, чтобы применить промокод');
@@ -1335,12 +1330,30 @@ async function applyPromoCode(){
   btn.disabled = true;
 
   try {
-    const { data } = await supabaseClient.functions.invoke('redeem-promo', {
-      body: { code, init_data: initData }
+    // Идём напрямую через fetch, а не supabaseClient.functions.invoke() —
+    // в некоторых версиях supabase-js тело ответа при не-2xx статусе
+    // невозможно надёжно прочитать через выброшенное исключение (оно уже
+    // "использовано" внутри библиотеки). Прямой fetch даёт полный контроль
+    // над Response и гарантированно позволяет прочитать JSON с кодом ошибки.
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/redeem-promo`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ code, init_data: initData })
     });
 
-    if(data?.error){
-      showToast(PROMO_ERROR_MESSAGES[data.error] || 'Не удалось применить промокод');
+    let data = null;
+    try { data = await resp.json(); } catch(parseErr){
+      console.error('redeem-promo: не удалось разобрать ответ', parseErr);
+    }
+
+    if(!resp.ok || data?.error){
+      const errCode = data?.error || null;
+      console.error('redeem-promo error:', errCode, 'status:', resp.status);
+      showToast(PROMO_ERROR_MESSAGES[errCode] || 'Не удалось применить промокод');
       return;
     }
 
@@ -1356,21 +1369,8 @@ async function applyPromoCode(){
     showToast(!Number.isNaN(credited) ? `Баланс пополнен на ${rub(credited)}` : 'Промокод применён');
 
   } catch(e){
-    // В этой версии supabase-js functions.invoke() не возвращает {error},
-    // а выбрасывает исключение (FunctionsHttpError и т.п.) при не-2xx
-    // ответе. Настоящий код ошибки (PROMO_NOT_FOUND и т.д.) лежит внутри
-    // тела ответа — e.context это Response, читаем из него JSON.
-    let errCode = null;
-    try {
-      if(e?.context && typeof e.context.json === 'function'){
-        const body = await e.context.json();
-        errCode = body?.error || null;
-      }
-    } catch(parseErr){
-      console.error('redeem-promo: не удалось разобрать тело ошибки', parseErr);
-    }
-    console.error('redeem-promo error:', errCode || e);
-    showToast(PROMO_ERROR_MESSAGES[errCode] || 'Не удалось применить промокод');
+    console.error('redeem-promo error:', e);
+    showToast('Не удалось применить промокод. Попробуйте ещё раз');
   } finally {
     btn.textContent = prevText;
     btn.disabled = false;
