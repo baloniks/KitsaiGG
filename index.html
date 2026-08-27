@@ -1309,10 +1309,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Подставляем реальные данные пользователя из Telegram
       const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+
+      // Отладочный вывод — помогает понять, что реально прислал Telegram
+      // (особенно полезно на Desktop-клиенте, где данных может не быть)
+      console.log('Telegram initDataUnsafe:', window.Telegram.WebApp.initDataUnsafe);
+      console.log('Telegram user:', tgUser);
+
       if (tgUser) {
         const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
         document.getElementById('userName').textContent = fullName || 'Пользователь';
-        document.getElementById('userHandle').textContent = tgUser.username ? '@' + tgUser.username : '';
+
+        const handleParts = [];
+        if (tgUser.username) handleParts.push('@' + tgUser.username);
+        if (tgUser.id) handleParts.push('ID: ' + tgUser.id);
+        document.getElementById('userHandle').textContent = handleParts.join(' · ');
 
         const avatarEl = document.getElementById('userAvatar');
         if (tgUser.photo_url) {
@@ -1324,6 +1334,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const initials = (tgUser.first_name?.[0] || '') + (tgUser.last_name?.[0] || '');
           avatarEl.textContent = initials.toUpperCase() || 'Ki';
         }
+      } else {
+        // Данные о пользователе не пришли вообще — сообщаем об этом явно,
+        // чтобы не гадать, почему профиль пустой (частый случай на Desktop-клиенте)
+        showToast('Telegram не передал данные профиля (id/ник). Обновите Telegram Desktop');
+        console.warn('tgUser отсутствует — initDataUnsafe.user пуст. Возможно, устаревший клиент Telegram Desktop или мини-апп открыт вне бота.');
       }
     } catch(e) {}
   }
