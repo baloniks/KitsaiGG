@@ -1254,8 +1254,27 @@ async function loadBalance(){
     const { data, error } = await supabaseClient.functions.invoke('get-profile', {
       body: { init_data: initData }
     });
-    if(error || !data || typeof data.balance !== 'number') return;
-    state.balance = data.balance;
+
+    if(error){
+      // Раньше ошибка молча проглатывалась — теперь она хотя бы видна в консоли,
+      // это помогает отличить сетевую/серверную ошибку от отсутствия данных.
+      console.error('get-profile error:', error);
+      return;
+    }
+
+    // ВАЖНО: numeric/decimal-колонки в Postgres часто приходят из Supabase
+    // строкой ("1250.00"), а не числом — из-за этого строгая проверка
+    // typeof data.balance !== 'number' раньше всегда была true и функция
+    // тихо выходила, даже если баланс на сервере уже обновился.
+    const rawBalance = data?.balance;
+    const parsedBalance = Number(rawBalance);
+
+    if(rawBalance == null || Number.isNaN(parsedBalance)){
+      console.warn('get-profile: некорректный balance в ответе:', rawBalance);
+      return;
+    }
+
+    state.balance = parsedBalance;
     renderBalance();
   } catch(e){
     console.error('get-profile error:', e);
