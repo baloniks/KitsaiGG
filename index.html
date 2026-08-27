@@ -1192,12 +1192,22 @@ function updateTopupBtn(){
   btn.textContent = 'Перейти к оплате · ' + rub(state.topupAmount);
 }
 
+function getTelegramInitData(){
+  return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) || '';
+}
+
 async function startCryptoPayment(){
   if(!state.topupAmount) return;
   const btn = document.getElementById('topupBtn');
 
   if(!supabaseClient){
     showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
+    return;
+  }
+
+  const initData = getTelegramInitData();
+  if(!initData){
+    showToast('Откройте приложение через Telegram-бота, чтобы пополнить баланс');
     return;
   }
 
@@ -1209,7 +1219,7 @@ async function startCryptoPayment(){
     const { data, error } = await supabaseClient.functions.invoke('create-invoice', {
       body: {
         amount_rub: state.topupAmount,
-        user_id: state.userId
+        init_data: initData
       }
     });
 
@@ -1221,6 +1231,10 @@ async function startCryptoPayment(){
     openExternalLink(data.pay_url);
     showToast('Счёт создан — завершите оплату в Crypto Bot');
 
+    // Как только пользователь вернётся в приложение (после оплаты
+    // в CryptoBot), подтягиваем баланс заново.
+    watchForBalanceUpdate();
+
   } catch(e){
     console.error('create-invoice error:', e);
     showToast('Не удалось создать счёт. Попробуйте ещё раз');
@@ -1229,6 +1243,42 @@ async function startCryptoPayment(){
     btn.classList.remove('disabled');
   }
 }
+
+/* Обновляем баланс с сервера */
+async function loadBalance(){
+  if(!supabaseClient) return;
+  const initData = getTelegramInitData();
+  if(!initData) return; // открыто вне Telegram — баланс останется 0 (демо-режим)
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('get-profile', {
+      body: { init_data: initData }
+    });
+    if(error || !data || typeof data.balance !== 'number') return;
+    state.balance = data.balance;
+    renderBalance();
+  } catch(e){
+    console.error('get-profile error:', e);
+  }
+}
+
+/* После открытия счёта CryptoBot периодически проверяем баланс,
+   пока пользователь не вернётся в мини-апп и оплата не подтвердится
+   вебхуком на сервере. */
+let balancePollTimer = null;
+function watchForBalanceUpdate(){
+  clearInterval(balancePollTimer);
+  let ticks = 0;
+  balancePollTimer = setInterval(() => {
+    ticks++;
+    loadBalance();
+    if(ticks >= 20) clearInterval(balancePollTimer); // ~2 минуты
+  }, 6000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') loadBalance();
+});
 
 function openTopup(){
   state.topupAmount = null;
@@ -1348,6 +1398,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Начальная отрисовка
   renderBalance();
   renderReferral();
+  loadBalance(); // подтягиваем реальный баланс из Supabase, если открыто в Telegram
 });
 </script>
 </body>
