@@ -4,16 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <title>KitsaiGG — цифровой магазин</title>
-  <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<title>KitsaiGG — цифровой магазин</title>
 
-<!-- Обязательный скрипт Telegram -->
+<!-- Обязательный скрипт Telegram WebApp -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-...
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -243,7 +237,7 @@
   }
   .stepper .n{font-family:var(--font-mono); font-weight:600; min-width:18px; text-align:center;}
 
-  /* ---------- Order bar (sticky bottom of view) ---------- */
+  /* ---------- Order bar ---------- */
   .order-bar{
     margin-top:22px; background:var(--surface); border:1px solid var(--border);
     border-radius:var(--radius-md); padding:14px;
@@ -267,8 +261,8 @@
     background:transparent; color:var(--text); font-weight:600; font-size:13.5px; padding:12px; cursor:pointer;
   }
 
-  /* ---------- Receipt (signature element) ---------- */
-  .receipt-wrap{margin-top:8px; position:relative; padding-top:9px;}
+  /* ---------- Receipt ---------- */
+  .receipt-wrap{margin-top:8px; position:relative; padding-top:99px;}
   .receipt-wrap::before{
     content:''; position:absolute; top:0; left:0; right:0; height:9px;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9' viewBox='0 0 16 9'%3E%3Cpath d='M0 9L8 0L16 9Z' fill='%2305060a'/%3E%3C/svg%3E");
@@ -340,6 +334,7 @@
   .avatar{
     width:54px; height:54px; border-radius:16px; background:var(--grad-brand); box-shadow:0 6px 18px rgba(124,92,240,.4);
     display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:18px; color:#fff;
+    overflow:hidden; background-size:cover; background-position:center;
   }
   .profile-head h2{font-family:var(--font-display); font-size:16px;}
   .profile-head span{font-size:12px; color:var(--text-faint);}
@@ -507,7 +502,7 @@
       </div>
     </section>
 
-    <!-- ===================== STARS / ROBUX (rate-based) ===================== -->
+    <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
       <div class="chip-grid" id="rateChips"></div>
       <div class="field">
@@ -523,7 +518,7 @@
       <button class="btn-primary" id="rateBuyBtn" onclick="attemptBuy('rate')">Выберите сумму</button>
     </section>
 
-    <!-- ===================== PREMIUM (duration-based) ===================== -->
+    <!-- ===================== PREMIUM ===================== -->
     <section class="view" data-view="premium-product">
       <div class="chip-grid" id="premiumChips" style="grid-template-columns:1fr 1fr;"></div>
       <div class="field">
@@ -538,12 +533,12 @@
       <button class="btn-primary" id="premiumBuyBtn" onclick="attemptBuy('premium')">Выберите срок</button>
     </section>
 
-    <!-- ===================== LIST-BASED (keys / giftcards) ===================== -->
+    <!-- ===================== LIST-BASED ===================== -->
     <section class="view" data-view="list-product">
       <div id="listProductRows"></div>
     </section>
 
-    <!-- ===================== LIST ITEM DETAIL (qty stepper) ===================== -->
+    <!-- ===================== ITEM DETAIL ===================== -->
     <section class="view" data-view="item-detail">
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
         <div class="cat-icon" id="itemGlyph" style="background:var(--surface-2); font-size:22px;">🎮</div>
@@ -571,7 +566,7 @@
       <button class="btn-primary" onclick="attemptBuy('item')">Купить</button>
     </section>
 
-    <!-- ===================== CHECKOUT CONFIRM (receipt) ===================== -->
+    <!-- ===================== CHECKOUT ===================== -->
     <section class="view" data-view="checkout">
       <div class="receipt-wrap">
         <div class="receipt" id="checkoutReceipt"></div>
@@ -610,10 +605,10 @@
     <!-- ===================== PROFILE ===================== -->
     <section class="view" data-view="profile">
       <div class="profile-head">
-        <div class="avatar">Ki</div>
+        <div class="avatar" id="userAvatar">Ki</div>
         <div>
-          <h2>Пользователь</h2>
-          <span>@kitsaigg_user</span>
+          <h2 id="userName">Пользователь</h2>
+          <span id="userHandle">@kitsaigg_user</span>
         </div>
       </div>
 
@@ -636,7 +631,7 @@
           <div class="ref-stat"><div class="n" id="refEarned">0 ₽</div><div class="l">заработано</div></div>
         </div>
         <div class="ref-link-row">
-          <span>kitsaigg.gg/r/kg_4471</span>
+          <span id="refLinkText">kitsaigg.gg/r/kg_4471</span>
           <button onclick="copyRef()">Копировать</button>
         </div>
       </div>
@@ -647,7 +642,7 @@
       <div class="list-link" onclick="openRules()"><div class="l"><span class="ic">📄</span>Правила сервиса</div><div class="r">›</div></div>
     </section>
 
-    <!-- ===================== SUPPORT (chat handoff) ===================== -->
+    <!-- ===================== SUPPORT ===================== -->
     <section class="view" data-view="support">
       <div class="empty-state" style="padding-top:20px;">
         <div class="glyph">💬</div>
@@ -657,11 +652,11 @@
       <div class="note-box">
         Кнопка ниже открывает чат с ботом поддержки в Telegram — там же можно приложить скриншот чека.
       </div>
-      <button class="btn-primary" onclick="showToast('Открываю @kitsaigg_support…')">Открыть чат в Telegram</button>
+      <button class="btn-primary" onclick="showToast('Открываю поддержку…')">Открыть чат в Telegram</button>
       <button class="btn-secondary" onclick="goBack()">Назад</button>
     </section>
 
-    <!-- ===================== TICKET FORM ===================== -->
+    <!-- ===================== TICKET ===================== -->
     <section class="view" data-view="ticket">
       <div class="field" style="margin-top:0;">
         <label>Тема обращения</label>
@@ -774,6 +769,39 @@ const state = {
   pendingPurchase:null,
   navStack:['catalog']
 };
+
+/* ---------------- TELEGRAM PROFILE INIT ---------------- */
+function initTelegramUser() {
+  if (window.Telegram && window.Telegram.WebApp) {
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const user = tg.initDataUnsafe?.user;
+    if (user) {
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
+      const username = user.username ? `@${user.username}` : `ID: ${user.id}`;
+      
+      document.getElementById('userName').textContent = fullName;
+      document.getElementById('userHandle').textContent = username;
+
+      // Устанавливаем аватар (или первую букву имени)
+      const avatarEl = document.getElementById('userAvatar');
+      if (user.photo_url) {
+        avatarEl.style.backgroundImage = `url('${user.photo_url}')`;
+        avatarEl.textContent = '';
+      } else {
+        avatarEl.textContent = user.first_name ? user.first_name[0].toUpperCase() : 'Ki';
+      }
+
+      // Автоматически подставляем username в поля ввода
+      if (user.username) {
+        document.getElementById('rateUsername').placeholder = `@${user.username}`;
+        document.getElementById('premiumUsername').placeholder = `@${user.username}`;
+      }
+    }
+  }
+}
 
 /* ---------------- PRODUCT CONFIG ---------------- */
 const RATE_CONFIG = {
@@ -897,7 +925,7 @@ function openCategory(cat){
   }
 }
 
-/* ---------------- RATE PRODUCT (stars/robux) ---------------- */
+/* ---------------- RATE PRODUCT ---------------- */
 function renderRateProduct(cat){
   const cfg = RATE_CONFIG[cat];
   state.rateSelected = null;
@@ -979,7 +1007,7 @@ function updatePremiumSummary(){
   btn.classList.remove('disabled');
 }
 
-/* ---------------- LIST PRODUCTS (keys / giftcards) ---------------- */
+/* ---------------- LIST PRODUCTS ---------------- */
 function renderListProduct(cat){
   const cfg = LIST_CONFIG[cat];
   const wrap = document.getElementById('listProductRows');
@@ -1053,9 +1081,6 @@ function attemptBuy(type){
   pushView('checkout', {sub:true, title:'Подтверждение'});
 }
 
-/* Money is always handled as whole rubles (integers) to avoid float drift
-   between what's shown, what's charged, and what a real payment webhook
-   would confirm. */
 function toKopecks(rub){ return Math.round(rub * 100); }
 function fromKopecks(k){ return Math.round(k) / 100; }
 
@@ -1095,9 +1120,6 @@ function renderCheckoutReceipt(p){
 
 function confirmPurchase(){
   const p = state.pendingPurchase;
-  /* Hard check right before charging — balance is re-read live, not cached,
-     so a stale screen can never cause an under- or over-charge. The amount
-     deducted always exactly equals p.price, in whole rubles. */
   const balanceKop = toKopecks(state.balance);
   const priceKop = toKopecks(p.price);
   if(balanceKop < priceKop){
@@ -1241,13 +1263,12 @@ function showToast(msg){
 }
 
 /* ---------------- INIT ---------------- */
+initTelegramUser();
 renderBalance();
 renderOrders();
 document.getElementById('refCount').textContent = state.referral.count;
 document.getElementById('refEarned').textContent = rub(state.referral.earned);
 </script>
-</body>
-<!-- Ваша верстка и основной скрипт -->
 
 <!-- Подключение логики кнопки админа -->
 <script src="admin-check.js"></script>
