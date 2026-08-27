@@ -160,9 +160,9 @@
     display:flex; flex-direction:column; gap:26px;
     cursor:pointer; position:relative; overflow:hidden;
     transition:border-color .15s, transform .15s, box-shadow .15s;
+    box-shadow:var(--shadow-card);
   }
   .cat-card:active{transform:scale(.97);}
-  .cat-card{box-shadow:var(--shadow-card);}
   .cat-card:hover{border-color:rgba(124,92,240,.4); box-shadow:var(--shadow-lift); transform:translateY(-2px);}
   .cat-card.wide{grid-column:1 / -1; flex-direction:row; align-items:center; justify-content:space-between; gap:8px;}
   .cat-icon{
@@ -216,6 +216,7 @@
     background:var(--surface); border:1px solid var(--border);
     border-radius:var(--radius-md); padding:12px 13px; margin-bottom:8px;
     box-shadow:var(--shadow-card); transition:transform .12s;
+    cursor:pointer;
   }
   .prod-row:active{transform:scale(.98);}
   .prod-row .glyph{
@@ -258,7 +259,7 @@
     box-shadow:0 6px 20px rgba(124,92,240,.35);
   }
   .btn-primary:active{transform:scale(.98); filter:brightness(.95);}
-  .btn-primary.disabled{background:var(--surface-3); color:var(--text-faint); cursor:default;}
+  .btn-primary.disabled{background:var(--surface-3); color:var(--text-faint); cursor:default; box-shadow:none; pointer-events:none;}
   .btn-secondary{
     width:100%; margin-top:10px; border:1px solid var(--border); border-radius:var(--radius-sm);
     background:transparent; color:var(--text); font-weight:600; font-size:13.5px; padding:12px; cursor:pointer;
@@ -378,21 +379,15 @@
 
   /* ---------- Top-up ---------- */
   .paymethod{
-    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border);
-    border-radius:var(--radius-md); padding:13px 14px; margin-bottom:8px; cursor:pointer;
+    display:flex; align-items:center; gap:12px; background:var(--accent-soft); border:1px solid var(--accent);
+    border-radius:var(--radius-md); padding:13px 14px; margin-bottom:8px; cursor:default;
   }
-  .paymethod.selected{border-color:var(--accent); background:var(--accent-soft);}
   .paymethod .pic{width:34px; height:34px; border-radius:9px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:16px;}
   .paymethod .pn{flex:1;}
   .paymethod .pn h4{font-size:13px; font-weight:600;}
   .paymethod .pn span{font-size:10.5px; color:var(--text-faint);}
-  .radio-dot{width:18px; height:18px; border-radius:50%; border:1.5px solid var(--border); position:relative; flex-shrink:0;}
-  .paymethod.selected .radio-dot{border-color:var(--accent);}
-  .paymethod.selected .radio-dot::after{content:''; position:absolute; inset:3px; border-radius:50%; background:var(--accent);}
-
-  .crypto-row{display:flex; gap:8px; margin-top:2px;}
-  .crypto-chip{flex:1; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid var(--border); background:var(--surface); border-radius:var(--radius-sm); padding:11px; cursor:pointer; font-size:12.5px; font-weight:600;}
-  .crypto-chip.selected{border-color:var(--gold); background:var(--gold-soft); color:var(--gold);}
+  .radio-dot{width:18px; height:18px; border-radius:50%; border:1.5px solid var(--accent); position:relative; flex-shrink:0;}
+  .radio-dot::after{content:''; position:absolute; inset:3px; border-radius:50%; background:var(--accent);}
 
   /* ---------- Bottom tabs ---------- */
   .tabbar{
@@ -518,7 +513,7 @@
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— ₽</span></div>
       </div>
-      <button class="btn-primary" id="rateBuyBtn" onclick="attemptBuy('rate')">Выберите сумму</button>
+      <button class="btn-primary disabled" id="rateBuyBtn" onclick="attemptBuy('rate')">Выберите сумму</button>
     </section>
 
     <!-- ===================== PREMIUM ===================== -->
@@ -533,7 +528,7 @@
         <div class="row"><span>Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
       </div>
-      <button class="btn-primary" id="premiumBuyBtn" onclick="attemptBuy('premium')">Выберите срок</button>
+      <button class="btn-primary disabled" id="premiumBuyBtn" onclick="attemptBuy('premium')">Выберите срок</button>
     </section>
 
     <!-- ===================== LIST-BASED ===================== -->
@@ -574,7 +569,7 @@
       <div class="receipt-wrap">
         <div class="receipt" id="checkoutReceipt"></div>
       </div>
-      <button class="btn-primary" onclick="confirmPurchase()">Подтвердить и оплатить</button>
+      <button class="btn-primary" id="checkoutConfirmBtn" onclick="confirmPurchase()">Подтвердить и оплатить</button>
       <button class="btn-secondary" onclick="goBack()">Отменить</button>
     </section>
 
@@ -655,7 +650,7 @@
       <div class="note-box">
         Кнопка ниже открывает чат с ботом поддержки в Telegram — там же можно приложить скриншот чека.
       </div>
-      <button class="btn-primary" onclick="showToast('Открываю поддержку…')">Открыть чат в Telegram</button>
+      <button class="btn-primary" onclick="openSupportTelegram()">Открыть чат в Telegram</button>
       <button class="btn-secondary" onclick="goBack()">Назад</button>
     </section>
 
@@ -701,18 +696,18 @@
       <div class="section-label" style="margin-top:0;">Сумма пополнения</div>
       <div class="chip-grid" id="topupChips"></div>
       <div class="field">
-        <label>Или введите свою сумму</label>
+        <label>Или введите свою сумму (₽)</label>
         <input type="number" id="topupCustom" placeholder="0 ₽" oninput="selectTopupCustom()">
       </div>
 
       <div class="section-label">Способ оплаты</div>
-      <div class="paymethod selected" data-m="crypto" onclick="selectPayMethod('crypto')">
+      <div class="paymethod">
         <div class="pic">🤖</div>
         <div class="pn"><h4>Crypto Bot (Telegram)</h4><span>USDT / TON / BTC / СБП</span></div>
         <div class="radio-dot"></div>
       </div>
 
-      <button class="btn-primary" id="topupBtn" onclick="confirmTopup()">Выберите сумму</button>
+      <button class="btn-primary disabled" id="topupBtn" onclick="confirmTopup()">Выберите сумму</button>
     </section>
 
   </main>
@@ -735,10 +730,11 @@
 
 <script>
 /* ---------------- SUPABASE INTEGRATION ---------------- */
-// Замените данные переменные на настройки вашего проекта Supabase (Project Settings -> API Keys)
 const SUPABASE_URL = 'https://your-project-id.supabase.co';
 const SUPABASE_ANON_KEY = 'your-anon-public-key';
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const supabase = (window.supabase && SUPABASE_URL !== 'https://your-project-id.supabase.co')
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+  : null;
 
 /* ---------------- STATE ---------------- */
 const state = {
@@ -749,13 +745,10 @@ const state = {
   referrerId: null,
   currentCategory: null,
   rateSelected: null,
-  rateCustom: false,
   premiumSelected: null,
   currentListItem: null,
   itemQty: 1,
   topupAmount: null,
-  payMethod: 'crypto',
-  cryptoCoin: 'USDT',
   pendingPurchase: null,
   navStack: ['catalog']
 };
@@ -800,19 +793,20 @@ async function initTelegramUser() {
     }
   }
 
-  // Генерация реферальной ссылки по ID
   state.referral.code = `https://t.me/your_bot?start=ref_${state.userId}`;
   document.getElementById('refLinkText').textContent = state.referral.code;
 
-  // Загружаем данные пользователя из Supabase
   await loadUserData();
 }
 
 async function loadUserData() {
-  if (!supabase) return;
+  if (!supabase) {
+    renderBalance();
+    renderOrders();
+    return;
+  }
 
   try {
-    // 1. Читаем или создаем профиль пользователя в Supabase
     let { data: profile, error } = await supabase
       .from('profiles')
       .select('balance, referrer_id')
@@ -820,7 +814,6 @@ async function loadUserData() {
       .single();
 
     if (error && error.code === 'PGRST116') {
-      // Пользователь новый — создаем запись
       const { data: newProfile } = await supabase
         .from('profiles')
         .insert({ id: state.userId, balance: 0, referrer_id: state.referrerId })
@@ -833,7 +826,6 @@ async function loadUserData() {
       state.balance = Number(profile.balance || 0);
     }
 
-    // 2. Получаем список заказов пользователя
     const { data: dbOrders } = await supabase
       .from('payments')
       .select('*')
@@ -924,7 +916,9 @@ function renderBalance(){
 /* ---------------- NAV ---------------- */
 function showView(name, {sub=false, title=''} = {}){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelector(`.view[data-view="${name}"]`).classList.add('active');
+  const targetView = document.querySelector(`.view[data-view="${name}"]`);
+  if (targetView) targetView.classList.add('active');
+
   document.getElementById('mainHeader').style.display = sub ? 'none' : 'flex';
   document.getElementById('subHeader').style.display = sub ? 'flex' : 'none';
   if(sub) document.getElementById('subHeaderTitle').textContent = title;
@@ -944,7 +938,9 @@ function pushView(name, opts){
 }
 
 function goBack(){
-  state.navStack.pop();
+  if (state.navStack.length > 1) {
+    state.navStack.pop();
+  }
   const prev = state.navStack[state.navStack.length-1] || 'catalog';
   const isTab = ['catalog','orders','profile'].includes(prev);
   if(isTab){
@@ -1162,7 +1158,7 @@ function receiptHTML(p, id, stamped){
 
 function renderCheckoutReceipt(p){
   document.getElementById('checkoutReceipt').innerHTML = receiptHTML(p, genId(), false);
-  const btn = document.querySelector('[data-view="checkout"] .btn-primary');
+  const btn = document.getElementById('checkoutConfirmBtn');
   if(state.balance < p.price){
     btn.textContent = 'Недостаточно средств — пополнить';
     btn.onclick = ()=>openTopup();
@@ -1179,7 +1175,6 @@ async function confirmPurchase(){
     return;
   }
   
-  // Списание средств в Supabase
   const newBalance = state.balance - p.price;
   if(supabase) {
     const { error } = await supabase
@@ -1236,8 +1231,9 @@ function activatePromo(){
   showToast('Промокод не найден');
 }
 
-/* ---------------- TOP-UP (Crypto Bot via Supabase) ---------------- */
+/* ---------------- TOP-UP (Crypto Bot) ---------------- */
 const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
+
 function renderTopupChips(){
   const grid = document.getElementById('topupChips');
   grid.innerHTML = '';
@@ -1245,24 +1241,29 @@ function renderTopupChips(){
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${a.toLocaleString('ru-RU')} ₽</div>`;
-    chip.onclick = ()=>{ state.topupAmount=a; document.getElementById('topupCustom').value=''; syncTopupChips(); updateTopupBtn(); };
+    chip.onclick = ()=>{ 
+      state.topupAmount = a; 
+      document.getElementById('topupCustom').value = ''; 
+      syncTopupChips(); 
+      updateTopupBtn(); 
+    };
     grid.appendChild(chip);
   });
 }
+
 function syncTopupChips(){
   document.querySelectorAll('#topupChips .chip').forEach((c,i)=>{
     c.classList.toggle('selected', TOPUP_AMOUNTS[i]===state.topupAmount);
   });
 }
+
 function selectTopupCustom(){
   const v = parseInt(document.getElementById('topupCustom').value)||null;
   state.topupAmount = v && v>0 ? v : null;
   syncTopupChips();
   updateTopupBtn();
 }
-function selectPayMethod(m){
-  state.payMethod = m;
-}
+
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
   if(!state.topupAmount){
@@ -1273,6 +1274,7 @@ function updateTopupBtn(){
   btn.classList.remove('disabled');
   btn.textContent = 'Перейти к оплате · ' + rub(state.topupAmount);
 }
+
 function openTopup(){
   state.topupAmount = null;
   document.getElementById('topupCustom').value = '';
@@ -1289,7 +1291,10 @@ async function confirmTopup(){
   btn.classList.add('disabled');
 
   try {
-    // Вызов Edge Function `create-invoice` из Supabase
+    if (!supabase) {
+      throw new Error('Укажите настройки Supabase в начале кода для подключения к Crypto Bot.');
+    }
+
     const { data, error } = await supabase.functions.invoke('create-invoice', {
       body: { 
         userId: state.userId, 
@@ -1301,11 +1306,10 @@ async function confirmTopup(){
       throw new Error(error?.message || 'Не удалось получить ссылку');
     }
 
-    // Перенаправляем пользователя на оплату счета в Telegram Crypto Bot
     if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
       window.Telegram.WebApp.openTelegramLink(data.pay_url);
     } else {
-      window.location.href = data.pay_url;
+      window.open(data.pay_url, '_blank');
     }
 
   } catch (err) {
@@ -1328,6 +1332,14 @@ function submitTicket(){
   if(!msg){ showToast('Опишите проблему'); return; }
   showToast('Тикет отправлен, номер #TK-' + Math.floor(1000+Math.random()*8999));
   setTimeout(()=>goTab('profile'), 600);
+}
+function openSupportTelegram(){
+  const url = 'https://t.me/your_support_bot';
+  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+    window.Telegram.WebApp.openTelegramLink(url);
+  } else {
+    window.open(url, '_blank');
+  }
 }
 
 /* ---------------- TOAST ---------------- */
