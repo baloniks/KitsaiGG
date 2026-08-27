@@ -1,7 +1,7 @@
 // admin-check.js
 
 // 1. Укажите ваш Telegram ID (замените 123456789 на ваш ID из @userinfobot)
-const ADMIN_TELEGRAM_ID = 123456789;
+const ADMIN_TELEGRAM_ID = 5697691423;
 
 document.addEventListener('DOMContentLoaded', () => {
   // Проверяем, запущено ли приложение в Telegram
