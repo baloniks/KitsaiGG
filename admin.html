@@ -462,23 +462,38 @@
 
 <script>
 /* ---------------- ADMIN AUTH ---------------- */
-const ADMIN_ID = 5697691423; // 👈 ВАЖНО: Замените на ваш числовой Telegram ID
+const ADMIN_ID = 5697691423; // Ваш числовой Telegram ID
 
-if (window.Telegram && window.Telegram.WebApp) {
-  const tg = window.Telegram.WebApp;
-  tg.ready();
-  
-  const user = tg.initDataUnsafe?.user;
-  
-  // Если зашел не админ — полностью скрываем интерфейс
-  if (!user || user.id !== ADMIN_ID) {
+(function checkAuth() {
+  let currentUserId = null;
+
+  // 1. Пытаемся взять ID из Telegram WebApp SDK
+  if (window.Telegram && window.Telegram.WebApp) {
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+      currentUserId = tg.initDataUnsafe.user.id;
+    }
+  }
+
+  // 2. Если SDK не вернул ID, проверяем параметры URL (admin.html?user_id=...)
+  if (!currentUserId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramId = urlParams.get('user_id');
+    if (paramId) {
+      currentUserId = parseInt(paramId, 10);
+    }
+  }
+
+  // 3. Проверка прав
+  if (!currentUserId || Number(currentUserId) !== Number(ADMIN_ID)) {
     document.body.innerHTML = `
       <div style="display:flex; height:100vh; width:100vw; align-items:center; justify-content:center; flex-direction:column; color:#FF5C6C; font-family:sans-serif; text-align:center; padding:20px;">
         <h1 style="font-size:48px; margin-bottom:10px;">403</h1>
         <p style="color:#8A8FA3; font-size:16px;">Доступ запрещён. У вас нет прав для просмотра этой панели.</p>
       </div>`;
   }
-}
+})();
 
 /* ---------------- NAV ---------------- */
 function goPage(p){
