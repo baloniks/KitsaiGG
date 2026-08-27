@@ -726,11 +726,27 @@
 </div>
 
 <script>
+/* ---------------- SUPABASE ---------------- */
+// TODO: подставьте свои значения из Project Settings → API в Supabase
+const SUPABASE_URL = 'https://YOUR_PROJECT_REF.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const supabaseClient = (window.supabase && SUPABASE_URL.includes('YOUR_PROJECT_REF') === false)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
 /* ---------------- STATE ---------------- */
-let savedGuestId = localStorage.getItem('kitsaigg_guest_id');
-if (!savedGuestId) {
+let savedGuestId = null;
+try {
+  savedGuestId = localStorage.getItem('kitsaigg_guest_id');
+  if (!savedGuestId) {
+    savedGuestId = 'guest_' + Math.floor(100000 + Math.random() * 900000);
+    localStorage.setItem('kitsaigg_guest_id', savedGuestId);
+  }
+} catch (e) {
+  // Некоторые встроенные браузеры Telegram блокируют localStorage —
+  // без этого catch скрипт падал здесь и ни один обработчик кнопок
+  // не успевал навеситься (DOMContentLoaded ниже просто не срабатывал)
   savedGuestId = 'guest_' + Math.floor(100000 + Math.random() * 900000);
-  localStorage.setItem('kitsaigg_guest_id', savedGuestId);
 }
 
 const state = {
@@ -810,6 +826,13 @@ function genId(){ return 'KG-' + Math.floor(70000+Math.random()*29999); }
 function renderBalance(){
   document.getElementById('balanceTop').textContent = rub(state.balance);
   document.getElementById('balanceProfile').textContent = rub(state.balance);
+}
+
+function renderReferral(){
+  document.getElementById('refCount').textContent = state.referral.count;
+  document.getElementById('refEarned').textContent = rub(state.referral.earned);
+  // TODO: замените KitsaiGGBot на username вашего бота
+  document.getElementById('refLinkText').textContent = 'https://t.me/KitsaiGGBot?start=ref_' + state.userId;
 }
 
 function openExternalLink(url) {
@@ -1169,6 +1192,44 @@ function updateTopupBtn(){
   btn.textContent = 'Перейти к оплате · ' + rub(state.topupAmount);
 }
 
+async function startCryptoPayment(){
+  if(!state.topupAmount) return;
+  const btn = document.getElementById('topupBtn');
+
+  if(!supabaseClient){
+    showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
+    return;
+  }
+
+  const prevText = btn.textContent;
+  btn.textContent = 'Создаём счёт...';
+  btn.classList.add('disabled');
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('create-invoice', {
+      body: {
+        amount_rub: state.topupAmount,
+        user_id: state.userId
+      }
+    });
+
+    if(error || !data || !data.pay_url){
+      throw new Error(error?.message || 'no pay_url in response');
+    }
+
+    // Открываем счёт Crypto Bot (мини-апп внутри Telegram или отдельная ссылка)
+    openExternalLink(data.pay_url);
+    showToast('Счёт создан — завершите оплату в Crypto Bot');
+
+  } catch(e){
+    console.error('create-invoice error:', e);
+    showToast('Не удалось создать счёт. Попробуйте ещё раз');
+  } finally {
+    btn.textContent = prevText;
+    btn.classList.remove('disabled');
+  }
+}
+
 function openTopup(){
   state.topupAmount = null;
   document.getElementById('topupCustom').value = '';
@@ -1242,6 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Профиль и пополнение
   document.getElementById('btnProfileTopup').addEventListener('click', openTopup);
   document.getElementById('topupCustom').addEventListener('input', selectTopupCustom);
+  document.getElementById('topupBtn').addEventListener('click', startCryptoPayment);
 
   // Ссылки в профиле
   document.getElementById('linkSupport').addEventListener('click', () => pushView('support', {sub:true, title:'Поддержка'}));
@@ -1251,8 +1313,41 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnSupportBack').addEventListener('click', goBack);
   document.getElementById('btnRulesBack').addEventListener('click', goBack);
 
+  // Открыть чат поддержки в Telegram
+  document.getElementById('btnTgSupport').addEventListener('click', () => {
+    openExternalLink('https://t.me/kitsaigg_support');
+  });
+
+  // Отправка тикета
+  document.getElementById('btnTicketSubmit').addEventListener('click', () => {
+    const msg = document.getElementById('ticketMsg').value.trim();
+    if (!msg) { showToast('Опишите проблему'); return; }
+    document.getElementById('ticketOrder').value = '';
+    document.getElementById('ticketMsg').value = '';
+    showToast('Тикет отправлен');
+    goBack();
+  });
+
+  // Промокод
+  document.getElementById('btnPromoApply').addEventListener('click', () => {
+    const code = document.getElementById('promoInput').value.trim();
+    if (!code) { showToast('Введите промокод'); return; }
+    showToast('Промокод не найден');
+  });
+
+  // Копировать реферальную ссылку
+  document.getElementById('btnCopyRef').addEventListener('click', () => {
+    const link = document.getElementById('refLinkText').textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(() => showToast('Ссылка скопирована'));
+    } else {
+      showToast('Ссылка скопирована');
+    }
+  });
+
   // Начальная отрисовка
   renderBalance();
+  renderReferral();
 });
 </script>
 </body>
