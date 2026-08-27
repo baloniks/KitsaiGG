@@ -1339,7 +1339,24 @@ async function applyPromoCode(){
       body: { code, init_data: initData }
     });
 
-    if(error) throw error;
+    if(error){
+      // Когда Edge Function отвечает не 2xx (наш случай для PROMO_NOT_FOUND,
+      // PROMO_ALREADY_USED и т.д.), supabase-js кладёt это в `error`, а не
+      // в `data`. Настоящее тело ответа лежит в error.context — без этого
+      // мы видели бы только общий "Не удалось применить промокод".
+      let errCode = null;
+      try {
+        if(error.context && typeof error.context.json === 'function'){
+          const body = await error.context.json();
+          errCode = body?.error || null;
+        }
+      } catch(parseErr){
+        console.error('redeem-promo: не удалось разобрать тело ошибки', parseErr);
+      }
+      console.error('redeem-promo error:', errCode || error);
+      showToast(PROMO_ERROR_MESSAGES[errCode] || 'Не удалось применить промокод');
+      return;
+    }
 
     if(data?.error){
       showToast(PROMO_ERROR_MESSAGES[data.error] || 'Не удалось применить промокод');
