@@ -124,9 +124,8 @@
 
   /* ---------- Main / views ---------- */
   main{flex:1; overflow-y:auto; padding-bottom:92px;}
-  .view{display:none; padding:4px 16px 20px; animation:fadeIn .18s ease;}
-  .view.active{display:block;}
-  @keyframes fadeIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  .view{display:none; padding:4px 16px 20px;}
+  .view.active{display:block !important;}
 
   .hero{
     padding:22px 18px; margin:10px 0 18px; border-radius:22px; position:relative; overflow:hidden;
@@ -161,19 +160,14 @@
     cursor:pointer; position:relative; overflow:hidden;
     transition:border-color .15s, transform .15s, box-shadow .15s;
     box-shadow:var(--shadow-card);
-    touch-action: manipulation;
   }
+  .cat-card * { pointer-events: none; }
   .cat-card:active{transform:scale(.97);}
-  .cat-card:hover{border-color:rgba(124,92,240,.4); box-shadow:var(--shadow-lift); transform:translateY(-2px);}
   .cat-card.wide{grid-column:1 / -1; flex-direction:row; align-items:center; justify-content:space-between; gap:8px;}
   .cat-icon{
     width:42px; height:42px; border-radius:13px;
     display:flex; align-items:center; justify-content:center;
     font-size:20px; position:relative;
-  }
-  .cat-icon::after{
-    content:''; position:absolute; inset:-6px; border-radius:16px; opacity:.55; filter:blur(10px); z-index:-1;
-    background:inherit;
   }
   .cat-card h3{font-family:var(--font-display); font-size:14.5px; font-weight:600; line-height:1.25;}
   .cat-card p{font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.35;}
@@ -186,8 +180,8 @@
     border-radius:var(--radius-sm); padding:12px 6px;
     text-align:center; cursor:pointer; transition:all .12s;
     box-shadow:var(--shadow-card);
-    touch-action: manipulation;
   }
+  .chip * { pointer-events: none; }
   .chip:active{transform:scale(.95);}
   .chip .amt{font-family:var(--font-mono); font-weight:600; font-size:14px;}
   .chip .sub{font-size:10px; color:var(--text-faint); margin-top:2px;}
@@ -219,7 +213,6 @@
     border-radius:var(--radius-md); padding:12px 13px; margin-bottom:8px;
     box-shadow:var(--shadow-card); transition:transform .12s;
     cursor:pointer;
-    touch-action: manipulation;
   }
   .prod-row:active{transform:scale(.98);}
   .prod-row .glyph{
@@ -260,14 +253,12 @@
     background:var(--grad-brand); color:#fff; font-family:var(--font-body); font-weight:600;
     font-size:14.5px; padding:14px; cursor:pointer; transition:filter .1s, transform .1s;
     box-shadow:0 6px 20px rgba(124,92,240,.35);
-    touch-action: manipulation;
   }
   .btn-primary:active{transform:scale(.98); filter:brightness(.95);}
   .btn-primary.disabled{background:var(--surface-3); color:var(--text-faint); cursor:default; box-shadow:none; pointer-events:none;}
   .btn-secondary{
     width:100%; margin-top:10px; border:1px solid var(--border); border-radius:var(--radius-sm);
     background:transparent; color:var(--text); font-weight:600; font-size:13.5px; padding:12px; cursor:pointer;
-    touch-action: manipulation;
   }
 
   /* ---------- Receipt ---------- */
@@ -360,6 +351,7 @@
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
     padding:14px 15px; margin-bottom:9px; cursor:pointer;
   }
+  .list-link * { pointer-events: none; }
   .list-link .l{display:flex; align-items:center; gap:11px; font-size:13.5px; font-weight:500;}
   .list-link .l .ic{font-size:16px;}
   .list-link .r{color:var(--text-faint); font-size:13px;}
@@ -402,7 +394,8 @@
     border-top:1px solid var(--border);
     display:flex; padding:9px 12px calc(9px + env(safe-area-inset-bottom));
   }
-  .tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; color:var(--text-faint); padding:4px 0; touch-action: manipulation;}
+  .tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; color:var(--text-faint); padding:4px 0;}
+  .tab * { pointer-events: none; }
   .tab .ic{font-size:19px; line-height:1;}
   .tab span{font-size:10px; font-weight:600;}
   .tab.active{color:var(--accent-2);}
@@ -420,7 +413,6 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
   ::-webkit-scrollbar{display:none;}
-  button:focus-visible, .chip:focus-visible, .cat-card:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 </style>
 </head>
 <body>
@@ -435,7 +427,7 @@
         <div class="brand-sub">цифровой магазин</div>
       </div>
     </div>
-    <div class="balance-chip" onclick="openTopup()">
+    <div class="balance-chip" id="btnHeaderBalance">
       <span class="val" id="balanceTop">0 ₽</span>
       <span class="plus">+</span>
     </div>
@@ -443,7 +435,7 @@
 
   <!-- ============ SUB-VIEW HEADER (back button) ============ -->
   <div class="back-header" id="subHeader" style="display:none;">
-    <div class="back-btn" onclick="goBack()">‹</div>
+    <div class="back-btn" id="btnBack">‹</div>
     <div class="back-title" id="subHeaderTitle">—</div>
   </div>
 
@@ -459,35 +451,35 @@
 
       <div class="section-label">Ячейки автомата</div>
       <div class="cat-grid">
-        <div class="cat-card" onclick="openCategory('stars')">
+        <div class="cat-card" data-cat="stars">
           <div class="cat-icon" style="background:var(--grad-gold); color:#2A1600;">⭐</div>
           <div>
             <h3>Telegram Stars</h3>
             <p>от 50 звёзд</p>
           </div>
         </div>
-        <div class="cat-card" onclick="openCategory('premium')">
+        <div class="cat-card" data-cat="premium">
           <div class="cat-icon" style="background:var(--grad-brand); color:#fff;">💎</div>
           <div>
             <h3>Telegram Premium</h3>
             <p>1–12 месяцев</p>
           </div>
         </div>
-        <div class="cat-card" onclick="openCategory('robux')">
+        <div class="cat-card" data-cat="robux">
           <div class="cat-icon" style="background:var(--grad-green); color:#04241C;">🟩</div>
           <div>
             <h3>Robux</h3>
             <p>без верификации</p>
           </div>
         </div>
-        <div class="cat-card" onclick="openCategory('giftcards')">
+        <div class="cat-card" data-cat="giftcards">
           <div class="cat-icon" style="background:var(--grad-gold); color:#2A1600;">🎁</div>
           <div>
             <h3>Подарочные карты</h3>
             <p>Steam, Google Play</p>
           </div>
         </div>
-        <div class="cat-card wide" onclick="openCategory('keys')">
+        <div class="cat-card wide" data-cat="keys">
           <div style="display:flex; align-items:center; gap:12px;">
             <div class="cat-icon" style="background:linear-gradient(135deg,#3A3F52,#252A3A); color:var(--text);">🎮</div>
             <div>
@@ -518,7 +510,7 @@
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— ₽</span></div>
       </div>
-      <button class="btn-primary disabled" id="rateBuyBtn" onclick="attemptBuy('rate')">Выберите сумму</button>
+      <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
     </section>
 
     <!-- ===================== PREMIUM ===================== -->
@@ -533,7 +525,7 @@
         <div class="row"><span>Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
       </div>
-      <button class="btn-primary disabled" id="premiumBuyBtn" onclick="attemptBuy('premium')">Выберите срок</button>
+      <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
     </section>
 
     <!-- ===================== LIST-BASED ===================== -->
@@ -557,16 +549,16 @@
       <div class="stepper-row">
         <span style="font-size:13px; color:var(--text-muted);">Количество</span>
         <div class="stepper">
-          <button onclick="changeItemQty(-1)">−</button>
+          <button id="btnQtyMinus">−</button>
           <span class="n" id="itemQty">1</span>
-          <button onclick="changeItemQty(1)">+</button>
+          <button id="btnQtyPlus">+</button>
         </div>
       </div>
       <div class="order-bar">
         <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— ₽</span></div>
       </div>
-      <button class="btn-primary" onclick="attemptBuy('item')">Купить</button>
+      <button class="btn-primary" id="btnItemBuy">Купить</button>
     </section>
 
     <!-- ===================== CHECKOUT ===================== -->
@@ -574,8 +566,8 @@
       <div class="receipt-wrap">
         <div class="receipt" id="checkoutReceipt"></div>
       </div>
-      <button class="btn-primary" id="checkoutConfirmBtn" onclick="confirmPurchase()">Подтвердить и оплатить</button>
-      <button class="btn-secondary" onclick="goBack()">Отменить</button>
+      <button class="btn-primary" id="checkoutConfirmBtn">Подтвердить и оплатить</button>
+      <button class="btn-secondary" id="btnCheckoutCancel">Отменить</button>
     </section>
 
     <!-- ===================== SUCCESS ===================== -->
@@ -588,7 +580,7 @@
       <div class="receipt-wrap">
         <div class="receipt" id="successReceipt"></div>
       </div>
-      <button class="btn-primary" onclick="goTab('catalog')">В каталог</button>
+      <button class="btn-primary" id="btnSuccessCatalog">В каталог</button>
     </section>
 
     <!-- ===================== ORDERS ===================== -->
@@ -597,10 +589,10 @@
         <h1 style="font-size:19px;">Мои заказы</h1>
       </div>
       <div class="filter-row">
-        <div class="filter-pill active" data-f="all" onclick="filterOrders('all')">Все</div>
-        <div class="filter-pill" data-f="stars" onclick="filterOrders('stars')">Stars / Premium</div>
-        <div class="filter-pill" data-f="robux" onclick="filterOrders('robux')">Robux</div>
-        <div class="filter-pill" data-f="other" onclick="filterOrders('other')">Ключи / карты</div>
+        <div class="filter-pill active" data-f="all">Все</div>
+        <div class="filter-pill" data-f="stars">Stars / Premium</div>
+        <div class="filter-pill" data-f="robux">Robux</div>
+        <div class="filter-pill" data-f="other">Ключи / карты</div>
       </div>
       <div id="ordersList"></div>
     </section>
@@ -618,12 +610,12 @@
       <div class="balance-card">
         <div class="lbl">Доступный баланс</div>
         <div class="val" id="balanceProfile">0 ₽</div>
-        <button class="btn-primary" style="margin-top:0;" onclick="openTopup()">Пополнить баланс</button>
+        <button class="btn-primary" style="margin-top:0;" id="btnProfileTopup">Пополнить баланс</button>
       </div>
 
       <div class="promo-row">
         <input type="text" id="promoInput" placeholder="Промокод">
-        <button onclick="activatePromo()">Применить</button>
+        <button id="btnPromoApply">Применить</button>
       </div>
 
       <div class="ref-card">
@@ -635,14 +627,14 @@
         </div>
         <div class="ref-link-row">
           <span id="refLinkText">Загрузка...</span>
-          <button onclick="copyRef()">Копировать</button>
+          <button id="btnCopyRef">Копировать</button>
         </div>
       </div>
 
       <div class="section-label" style="margin-top:6px;">Поддержка</div>
-      <div class="list-link" onclick="openSupport()"><div class="l"><span class="ic">💬</span>Написать в поддержку</div><div class="r">›</div></div>
-      <div class="list-link" onclick="openTicket()"><div class="l"><span class="ic">🎫</span>Создать тикет</div><div class="r">›</div></div>
-      <div class="list-link" onclick="openRules()"><div class="l"><span class="ic">📄</span>Правила сервиса</div><div class="r">›</div></div>
+      <div class="list-link" id="linkSupport"><div class="l"><span class="ic">💬</span>Написать в поддержку</div><div class="r">›</div></div>
+      <div class="list-link" id="linkTicket"><div class="l"><span class="ic">🎫</span>Создать тикет</div><div class="r">›</div></div>
+      <div class="list-link" id="linkRules"><div class="l"><span class="ic">📄</span>Правила сервиса</div><div class="r">›</div></div>
     </section>
 
     <!-- ===================== SUPPORT ===================== -->
@@ -655,8 +647,8 @@
       <div class="note-box">
         Кнопка ниже открывает чат с ботом поддержки в Telegram — там же можно приложить скриншот чека.
       </div>
-      <button class="btn-primary" onclick="openSupportTelegram()">Открыть чат в Telegram</button>
-      <button class="btn-secondary" onclick="goBack()">Назад</button>
+      <button class="btn-primary" id="btnTgSupport">Открыть чат в Telegram</button>
+      <button class="btn-secondary" id="btnSupportBack">Назад</button>
     </section>
 
     <!-- ===================== TICKET ===================== -->
@@ -678,7 +670,7 @@
         <label>Опишите проблему</label>
         <textarea id="ticketMsg" rows="5" placeholder="Что произошло?" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-body); font-size:13.5px; outline:none; resize:vertical;"></textarea>
       </div>
-      <button class="btn-primary" onclick="submitTicket()">Отправить тикет</button>
+      <button class="btn-primary" id="btnTicketSubmit">Отправить тикет</button>
     </section>
 
     <!-- ===================== RULES ===================== -->
@@ -693,7 +685,7 @@
         <p style="color:var(--text); font-weight:600; margin-bottom:6px;">4. Реферальная программа</p>
         <p>Начисления 1% действуют с покупок всех зарегистрировавшихся по вашей ссылке пользователей.</p>
       </div>
-      <button class="btn-secondary" onclick="goBack()">Назад</button>
+      <button class="btn-secondary" id="btnRulesBack">Назад</button>
     </section>
 
     <!-- ===================== TOP-UP ===================== -->
@@ -702,7 +694,7 @@
       <div class="chip-grid" id="topupChips"></div>
       <div class="field">
         <label>Или введите свою сумму (₽)</label>
-        <input type="number" id="topupCustom" placeholder="0 ₽" oninput="selectTopupCustom()">
+        <input type="number" id="topupCustom" placeholder="0 ₽">
       </div>
 
       <div class="section-label">Способ оплаты</div>
@@ -712,20 +704,20 @@
         <div class="radio-dot"></div>
       </div>
 
-      <button class="btn-primary disabled" id="topupBtn" onclick="confirmTopup()">Выберите сумму</button>
+      <button class="btn-primary disabled" id="topupBtn">Выберите сумму</button>
     </section>
 
   </main>
 
   <!-- ============ TAB BAR ============ -->
   <nav class="tabbar" id="tabbar">
-    <div class="tab active" data-tab="catalog" onclick="goTab('catalog')">
+    <div class="tab active" data-tab="catalog">
       <div class="ic">▦</div><span>Каталог</span>
     </div>
-    <div class="tab" data-tab="orders" onclick="goTab('orders')">
+    <div class="tab" data-tab="orders">
       <div class="ic">🧾</div><span>Заказы</span>
     </div>
-    <div class="tab" data-tab="profile" onclick="goTab('profile')">
+    <div class="tab" data-tab="profile">
       <div class="ic">◑</div><span>Профиль</span>
     </div>
   </nav>
@@ -734,15 +726,7 @@
 </div>
 
 <script>
-/* ---------------- SUPABASE INTEGRATION ---------------- */
-const SUPABASE_URL = 'https://your-project-id.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-public-key';
-const supabase = (window.supabase && SUPABASE_URL !== 'https://your-project-id.supabase.co')
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
-  : null;
-
 /* ---------------- STATE ---------------- */
-// Сохраняем случайный ID гостя в localStorage, чтобы при перезагрузке вне TG не терять прогресс
 let savedGuestId = localStorage.getItem('kitsaigg_guest_id');
 if (!savedGuestId) {
   savedGuestId = 'guest_' + Math.floor(100000 + Math.random() * 900000);
@@ -764,126 +748,6 @@ const state = {
   pendingPurchase: null,
   navStack: ['catalog']
 };
-
-/* ---------------- TELEGRAM PROFILE & USER DATA INIT ---------------- */
-async function initTelegramUser() {
-  let isTg = false;
-  if (window.Telegram && window.Telegram.WebApp) {
-    const tg = window.Telegram.WebApp;
-    // Обязательная инициализация интерфейса WebApp
-    try {
-      tg.ready();
-      tg.expand();
-    } catch(e) {}
-
-    const user = tg.initDataUnsafe?.user;
-    if (user && user.id) {
-      isTg = true;
-      state.userId = user.id.toString();
-
-      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-      const username = user.username ? `@${user.username}` : `ID: ${user.id}`;
-      
-      document.getElementById('userName').textContent = fullName;
-      document.getElementById('userHandle').textContent = username;
-
-      const avatarEl = document.getElementById('userAvatar');
-      if (user.photo_url) {
-        avatarEl.style.backgroundImage = `url('${user.photo_url}')`;
-        avatarEl.textContent = '';
-      } else {
-        avatarEl.textContent = user.first_name ? user.first_name[0].toUpperCase() : 'Ki';
-      }
-
-      if (user.username) {
-        document.getElementById('rateUsername').placeholder = `@${user.username}`;
-        document.getElementById('premiumUsername').placeholder = `@${user.username}`;
-      }
-
-      const startParam = tg.initDataUnsafe?.start_param;
-      if (startParam && startParam.startsWith('ref_')) {
-        const refId = startParam.replace('ref_', '');
-        if (refId !== state.userId) {
-          state.referrerId = refId;
-        }
-      }
-    }
-  }
-
-  // Если открыто вне Telegram (обычный браузер)
-  if (!isTg) {
-    document.getElementById('userName').textContent = 'Гость';
-    document.getElementById('userHandle').textContent = `ID: ${state.userId}`;
-    
-    // Попытка получить ref из URL в браузере (?ref=123)
-    const urlParams = new URLSearchParams(window.location.search);
-    const refParam = urlParams.get('ref') || urlParams.get('start');
-    if (refParam) {
-      const refId = refParam.replace('ref_', '');
-      if (refId !== state.userId) {
-        state.referrerId = refId;
-      }
-    }
-  }
-
-  state.referral.code = `https://t.me/your_bot?start=ref_${state.userId}`;
-  document.getElementById('refLinkText').textContent = state.referral.code;
-
-  await loadUserData();
-}
-
-async function loadUserData() {
-  if (!supabase) {
-    renderBalance();
-    renderOrders();
-    return;
-  }
-
-  try {
-    let { data: profile, error } = await supabase
-      .from('profiles')
-      .select('balance, referrer_id')
-      .eq('id', state.userId)
-      .single();
-
-    if (error && error.code === 'PGRST116') {
-      const { data: newProfile } = await supabase
-        .from('profiles')
-        .insert({ id: state.userId, balance: 0, referrer_id: state.referrerId })
-        .select()
-        .single();
-      profile = newProfile;
-    }
-
-    if (profile) {
-      state.balance = Number(profile.balance || 0);
-    }
-
-    const { data: dbOrders } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('user_id', state.userId)
-      .order('created_at', { ascending: false });
-
-    if (dbOrders) {
-      state.orders = dbOrders.map(o => ({
-        id: 'KG-' + o.invoice_id,
-        cat: 'other',
-        glyph: '🧾',
-        title: `Пополнение баланса`,
-        date: new Date(o.created_at).toLocaleDateString('ru-RU'),
-        price: Number(o.amount),
-        status: o.status === 'paid' ? 'Выполнен' : 'В процессе'
-      }));
-    }
-
-  } catch (err) {
-    console.error('Ошибка загрузки Supabase:', err);
-  }
-
-  renderBalance();
-  renderOrders();
-}
 
 /* ---------------- PRODUCT CONFIG ---------------- */
 const RATE_CONFIG = {
@@ -933,6 +797,8 @@ const LIST_CONFIG = {
   }
 };
 
+const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
+
 /* ---------------- HELPERS ---------------- */
 const rub = n => n.toLocaleString('ru-RU') + ' ₽';
 function fmtDate(){
@@ -946,7 +812,6 @@ function renderBalance(){
   document.getElementById('balanceProfile').textContent = rub(state.balance);
 }
 
-/* ---------------- UNIVERSAL LINK OPENER ---------------- */
 function openExternalLink(url) {
   if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openTelegramLink === 'function' && url.includes('t.me')) {
     window.Telegram.WebApp.openTelegramLink(url);
@@ -957,11 +822,15 @@ function openExternalLink(url) {
   }
 }
 
-/* ---------------- NAV ---------------- */
+/* ---------------- CORE ROUTING (VIEW MANAGEMENT) ---------------- */
 function showView(name, {sub=false, title=''} = {}){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const views = document.querySelectorAll('.view');
+  views.forEach(v => v.classList.remove('active'));
+
   const targetView = document.querySelector(`.view[data-view="${name}"]`);
-  if (targetView) targetView.classList.add('active');
+  if (targetView) {
+    targetView.classList.add('active');
+  }
 
   document.getElementById('mainHeader').style.display = sub ? 'none' : 'flex';
   document.getElementById('subHeader').style.display = sub ? 'flex' : 'none';
@@ -971,9 +840,9 @@ function showView(name, {sub=false, title=''} = {}){
 
 function goTab(tab){
   state.navStack = [tab];
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   showView(tab);
-  if(tab==='orders') renderOrders();
+  if(tab === 'orders') renderOrders();
 }
 
 function pushView(name, opts){
@@ -988,7 +857,7 @@ function goBack(){
   const prev = state.navStack[state.navStack.length-1] || 'catalog';
   const isTab = ['catalog','orders','profile'].includes(prev);
   if(isTab){
-    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===prev));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === prev));
     showView(prev);
   } else {
     showView(prev, {sub:true, title: viewTitle(prev)});
@@ -1007,13 +876,13 @@ function viewTitle(v){
   return map[v] || '';
 }
 
-/* ---------------- CATEGORY OPEN ---------------- */
+/* ---------------- CATEGORY & PRODUCT RENDERING ---------------- */
 function openCategory(cat){
   state.currentCategory = cat;
   if(RATE_CONFIG[cat]){
     renderRateProduct(cat);
     pushView('rate-product', {sub:true, title:RATE_CONFIG[cat].title});
-  } else if(cat==='premium'){
+  } else if(cat === 'premium'){
     renderPremiumProduct();
     pushView('premium-product', {sub:true, title:'Telegram Premium'});
   } else if(LIST_CONFIG[cat]){
@@ -1022,7 +891,6 @@ function openCategory(cat){
   }
 }
 
-/* ---------------- RATE PRODUCT ---------------- */
 function renderRateProduct(cat){
   const cfg = RATE_CONFIG[cat];
   state.rateSelected = null;
@@ -1034,26 +902,28 @@ function renderRateProduct(cat){
 
   const grid = document.getElementById('rateChips');
   grid.innerHTML = '';
-  cfg.options.forEach(opt=>{
-    const price = Math.round(opt*cfg.rate);
+  cfg.options.forEach(opt => {
+    const price = Math.round(opt * cfg.rate);
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${opt.toLocaleString('ru-RU')} ${cfg.unit}</div><div class="sub">${rub(price)}</div>`;
-    chip.onclick = ()=>selectRate(opt, chip);
+    chip.addEventListener('click', () => selectRate(opt, chip));
     grid.appendChild(chip);
   });
   updateRateSummary();
 }
+
 function selectRate(opt, el){
-  document.querySelectorAll('#rateChips .chip').forEach(c=>c.classList.remove('selected'));
+  document.querySelectorAll('#rateChips .chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   state.rateSelected = opt;
   updateRateSummary();
 }
+
 function updateRateSummary(){
   const cfg = RATE_CONFIG[state.currentCategory];
   const btn = document.getElementById('rateBuyBtn');
-  if(state.rateSelected==null){
+  if(state.rateSelected == null){
     document.getElementById('rateQtyVal').textContent = '—';
     document.getElementById('rateTotalVal').textContent = '— ₽';
     btn.textContent = 'Выберите сумму';
@@ -1067,30 +937,31 @@ function updateRateSummary(){
   btn.classList.remove('disabled');
 }
 
-/* ---------------- PREMIUM ---------------- */
 function renderPremiumProduct(){
   state.premiumSelected = null;
   document.getElementById('premiumUsername').value = '';
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
-  PREMIUM_PLANS.forEach((p,i)=>{
+  PREMIUM_PLANS.forEach((p, i) => {
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${p.label}</div><div class="sub">${rub(p.price)}</div>`;
-    chip.onclick = ()=>selectPremium(i, chip);
+    chip.addEventListener('click', () => selectPremium(i, chip));
     grid.appendChild(chip);
   });
   updatePremiumSummary();
 }
+
 function selectPremium(i, el){
-  document.querySelectorAll('#premiumChips .chip').forEach(c=>c.classList.remove('selected'));
+  document.querySelectorAll('#premiumChips .chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   state.premiumSelected = i;
   updatePremiumSummary();
 }
+
 function updatePremiumSummary(){
   const btn = document.getElementById('premiumBuyBtn');
-  if(state.premiumSelected==null){
+  if(state.premiumSelected == null){
     document.getElementById('premiumPlanVal').textContent = '—';
     document.getElementById('premiumTotalVal').textContent = '— ₽';
     btn.textContent = 'Выберите срок';
@@ -1104,12 +975,11 @@ function updatePremiumSummary(){
   btn.classList.remove('disabled');
 }
 
-/* ---------------- LIST PRODUCTS ---------------- */
 function renderListProduct(cat){
   const cfg = LIST_CONFIG[cat];
   const wrap = document.getElementById('listProductRows');
   wrap.innerHTML = `<div class="section-label" style="margin-top:0;">${cfg.title}</div>`;
-  cfg.items.forEach(item=>{
+  cfg.items.forEach(item => {
     const row = document.createElement('div');
     row.className = 'prod-row';
     row.innerHTML = `
@@ -1117,11 +987,12 @@ function renderListProduct(cat){
       <div class="info"><h4>${item.title}</h4><span>${item.sub}</span></div>
       <div class="price">${rub(item.price)}</div>
       <button class="buy-mini">Купить</button>`;
-    row.querySelector('.buy-mini').onclick = (e)=>{ e.stopPropagation(); openItemDetail(item); };
-    row.onclick = ()=>openItemDetail(item);
+    
+    row.addEventListener('click', () => openItemDetail(item));
     wrap.appendChild(row);
   });
 }
+
 function openItemDetail(item){
   state.currentListItem = item;
   state.itemQty = 1;
@@ -1132,10 +1003,12 @@ function openItemDetail(item){
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
 }
+
 function changeItemQty(d){
   state.itemQty = Math.max(1, Math.min(20, state.itemQty + d));
   updateItemSummary();
 }
+
 function updateItemSummary(){
   const item = state.currentListItem;
   document.getElementById('itemQty').textContent = state.itemQty;
@@ -1146,8 +1019,8 @@ function updateItemSummary(){
 /* ---------------- BUY FLOW ---------------- */
 function attemptBuy(type){
   let purchase;
-  if(type==='rate'){
-    if(state.rateSelected==null) return;
+  if(type === 'rate'){
+    if(state.rateSelected == null) return;
     const cfg = RATE_CONFIG[state.currentCategory];
     const username = document.getElementById('rateUsername').value.trim();
     if(!username){ showToast('Укажите получателя'); return; }
@@ -1157,13 +1030,13 @@ function attemptBuy(type){
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
       recipient: username, price: total
     };
-  } else if(type==='premium'){
-    if(state.premiumSelected==null) return;
+  } else if(type === 'premium'){
+    if(state.premiumSelected == null) return;
     const username = document.getElementById('premiumUsername').value.trim();
     if(!username){ showToast('Укажите получателя'); return; }
     const plan = PREMIUM_PLANS[state.premiumSelected];
     purchase = { cat:'stars', glyph:'💎', title:'Telegram Premium · ' + plan.label, recipient: username, price: plan.price };
-  } else if(type==='item'){
+  } else if(type === 'item'){
     const item = state.currentListItem;
     const username = document.getElementById('itemUsername').value.trim();
     if(!username){ showToast('Укажите получателя'); return; }
@@ -1205,34 +1078,21 @@ function renderCheckoutReceipt(p){
   const btn = document.getElementById('checkoutConfirmBtn');
   if(state.balance < p.price){
     btn.textContent = 'Недостаточно средств — пополнить';
-    btn.onclick = ()=>openTopup();
+    btn.onclick = () => openTopup();
   } else {
     btn.textContent = 'Подтвердить и оплатить';
     btn.onclick = confirmPurchase;
   }
 }
 
-async function confirmPurchase(){
+function confirmPurchase(){
   const p = state.pendingPurchase;
   if(state.balance < p.price){
     showToast('Недостаточно средств');
     return;
   }
   
-  const newBalance = state.balance - p.price;
-  if(supabase) {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ balance: newBalance })
-      .eq('id', state.userId);
-      
-    if (error) {
-      showToast('Ошибка при списании баланса');
-      return;
-    }
-  }
-
-  state.balance = newBalance;
+  state.balance -= p.price;
   const id = genId();
   state.orders.unshift({
     id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
@@ -1245,15 +1105,15 @@ async function confirmPurchase(){
   showView('success', {sub:true, title:'Готово'});
 }
 
-/* ---------------- ORDERS ---------------- */
+/* ---------------- ORDERS VIEW ---------------- */
 function renderOrders(filter='all'){
   const list = document.getElementById('ordersList');
-  const filtered = state.orders.filter(o=> filter==='all' ? true : o.cat===filter);
-  if(filtered.length===0){
+  const filtered = state.orders.filter(o => filter==='all' ? true : o.cat===filter);
+  if(filtered.length === 0){
     list.innerHTML = `<div class="empty-state"><div class="glyph">🧾</div><h3>Пока пусто</h3><p>Здесь появятся чеки за купленные звёзды, Premium, Robux, ключи и карты.</p></div>`;
     return;
   }
-  list.innerHTML = filtered.map(o=>`
+  list.innerHTML = filtered.map(o => `
     <div class="order-item">
       <div class="glyph">${o.glyph}</div>
       <div class="meta"><h4>${o.title}</h4><span>${o.id} · ${o.date}</span></div>
@@ -1261,75 +1121,39 @@ function renderOrders(filter='all'){
     </div>
   `).join('');
 }
+
 function filterOrders(f){
-  document.querySelectorAll('.filter-pill').forEach(p=>p.classList.toggle('active', p.dataset.f===f));
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p.dataset.f===f));
   renderOrders(f);
 }
 
-/* ---------------- PROFILE / REFERRAL / PROMO ---------------- */
-function copyRef(){
-  const textToCopy = state.referral.code;
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      showToast('Реферальная ссылка скопирована');
-    }).catch(() => {
-      fallbackCopyTextToClipboard(textToCopy);
-    });
-  } else {
-    fallbackCopyTextToClipboard(textToCopy);
-  }
-}
-
-function fallbackCopyTextToClipboard(text) {
-  const textArea = document.createElement("textarea");
-  textArea.value = text;
-  textArea.style.position = "fixed";
-  textArea.style.left = "-999999px";
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-  try {
-    document.execCommand('copy');
-    showToast('Реферальная ссылка скопирована');
-  } catch (err) {
-    showToast('Не удалось скопировать');
-  }
-  document.body.removeChild(textArea);
-}
-
-function activatePromo(){
-  showToast('Промокод не найден');
-}
-
-/* ---------------- TOP-UP (Crypto Bot) ---------------- */
-const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
-
+/* ---------------- TOPUP ---------------- */
 function renderTopupChips(){
   const grid = document.getElementById('topupChips');
   grid.innerHTML = '';
-  TOPUP_AMOUNTS.forEach(a=>{
+  TOPUP_AMOUNTS.forEach(a => {
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${a.toLocaleString('ru-RU')} ₽</div>`;
-    chip.onclick = ()=>{ 
+    chip.addEventListener('click', () => { 
       state.topupAmount = a; 
       document.getElementById('topupCustom').value = ''; 
       syncTopupChips(); 
       updateTopupBtn(); 
-    };
+    });
     grid.appendChild(chip);
   });
 }
 
 function syncTopupChips(){
-  document.querySelectorAll('#topupChips .chip').forEach((c,i)=>{
-    c.classList.toggle('selected', TOPUP_AMOUNTS[i]===state.topupAmount);
+  document.querySelectorAll('#topupChips .chip').forEach((c, i) => {
+    c.classList.toggle('selected', TOPUP_AMOUNTS[i] === state.topupAmount);
   });
 }
 
 function selectTopupCustom(){
-  const v = parseInt(document.getElementById('topupCustom').value)||null;
-  state.topupAmount = v && v>0 ? v : null;
+  const v = parseInt(document.getElementById('topupCustom').value) || null;
+  state.topupAmount = v && v > 0 ? v : null;
   syncTopupChips();
   updateTopupBtn();
 }
@@ -1354,56 +1178,6 @@ function openTopup(){
   pushView('topup', {sub:true, title:'Пополнение баланса'});
 }
 
-async function confirmTopup(){
-  if(!state.topupAmount) return;
-  const btn = document.getElementById('topupBtn');
-  btn.textContent = 'Создаём счёт...';
-  btn.classList.add('disabled');
-
-  try {
-    if (!supabase) {
-      throw new Error('Укажите настройки Supabase в начале кода для подключения к Crypto Bot.');
-    }
-
-    const { data, error } = await supabase.functions.invoke('create-invoice', {
-      body: { 
-        userId: state.userId, 
-        amountRub: state.topupAmount 
-      }
-    });
-
-    if (error || !data?.pay_url) {
-      throw new Error(error?.message || 'Не удалось получить ссылку');
-    }
-
-    openExternalLink(data.pay_url);
-
-  } catch (err) {
-    showToast('Ошибка: ' + err.message);
-  } finally {
-    updateTopupBtn();
-  }
-}
-
-/* ---------------- SUPPORT / TICKET / RULES ---------------- */
-function openSupport(){ pushView('support', {sub:true, title:'Поддержка'}); }
-function openRules(){ pushView('rules', {sub:true, title:'Правила сервиса'}); }
-function openTicket(){
-  document.getElementById('ticketOrder').value = '';
-  document.getElementById('ticketMsg').value = '';
-  pushView('ticket', {sub:true, title:'Новый тикет'});
-}
-function submitTicket(){
-  const msg = document.getElementById('ticketMsg').value.trim();
-  if(!msg){ showToast('Опишите проблему'); return; }
-  showToast('Тикет отправлен, номер #TK-' + Math.floor(1000+Math.random()*8999));
-  setTimeout(()=>goTab('profile'), 600);
-}
-function openSupportTelegram(){
-  const url = 'https://t.me/your_support_bot';
-  openExternalLink(url);
-}
-
 /* ---------------- TOAST ---------------- */
 let toastTimer;
 function showToast(msg){
@@ -1411,11 +1185,75 @@ function showToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-/* ---------------- INIT ---------------- */
-initTelegramUser();
+/* ---------------- EVENT LISTENERS ATTACHMENT ---------------- */
+document.addEventListener('DOMContentLoaded', () => {
+  // Инициализация Telegram WebApp
+  if (window.Telegram && window.Telegram.WebApp) {
+    try {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    } catch(e) {}
+  }
+
+  // Нижняя панель (Табы)
+  document.querySelectorAll('.tabbar .tab').forEach(tabEl => {
+    tabEl.addEventListener('click', () => {
+      const tabName = tabEl.getAttribute('data-tab');
+      goTab(tabName);
+    });
+  });
+
+  // Кнопка назад в шапке
+  document.getElementById('btnBack').addEventListener('click', goBack);
+
+  // Кнопка баланса в шапке
+  document.getElementById('btnHeaderBalance').addEventListener('click', openTopup);
+
+  // Карточки категорий на главной
+  document.querySelectorAll('.cat-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const cat = card.getAttribute('data-cat');
+      if(cat) openCategory(cat);
+    });
+  });
+
+  // Фильтры заказов
+  document.querySelectorAll('.filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const filter = pill.getAttribute('data-f');
+      filterOrders(filter);
+    });
+  });
+
+  // Кнопки покупок на экранах товаров
+  document.getElementById('rateBuyBtn').addEventListener('click', () => attemptBuy('rate'));
+  document.getElementById('premiumBuyBtn').addEventListener('click', () => attemptBuy('premium'));
+  document.getElementById('btnItemBuy').addEventListener('click', () => attemptBuy('item'));
+  document.getElementById('btnCheckoutCancel').addEventListener('click', goBack);
+  document.getElementById('btnSuccessCatalog').addEventListener('click', () => goTab('catalog'));
+
+  // Кнопки количества (+ / -)
+  document.getElementById('btnQtyMinus').addEventListener('click', () => changeItemQty(-1));
+  document.getElementById('btnQtyPlus').addEventListener('click', () => changeItemQty(1));
+
+  // Профиль и пополнение
+  document.getElementById('btnProfileTopup').addEventListener('click', openTopup);
+  document.getElementById('topupCustom').addEventListener('input', selectTopupCustom);
+
+  // Ссылки в профиле
+  document.getElementById('linkSupport').addEventListener('click', () => pushView('support', {sub:true, title:'Поддержка'}));
+  document.getElementById('linkTicket').addEventListener('click', () => pushView('ticket', {sub:true, title:'Новый тикет'}));
+  document.getElementById('linkRules').addEventListener('click', () => pushView('rules', {sub:true, title:'Правила сервиса'}));
+
+  document.getElementById('btnSupportBack').addEventListener('click', goBack);
+  document.getElementById('btnRulesBack').addEventListener('click', goBack);
+
+  // Начальная отрисовка
+  renderBalance();
+});
 </script>
 </body>
 </html>
