@@ -8,6 +8,9 @@
 <!-- Обязательный скрипт Telegram WebApp -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+<!-- Клиентская библиотека Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -262,7 +265,7 @@
   }
 
   /* ---------- Receipt ---------- */
-  .receipt-wrap{margin-top:8px; position:relative; padding-top:99px;}
+  .receipt-wrap{margin-top:8px; position:relative; padding-top:9px;}
   .receipt-wrap::before{
     content:''; position:absolute; top:0; left:0; right:0; height:9px;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9' viewBox='0 0 16 9'%3E%3Cpath d='M0 9L8 0L16 9Z' fill='%2305060a'/%3E%3C/svg%3E");
@@ -703,27 +706,10 @@
       </div>
 
       <div class="section-label">Способ оплаты</div>
-      <div class="paymethod selected" data-m="card" onclick="selectPayMethod('card')">
-        <div class="pic">💳</div>
-        <div class="pn"><h4>Банковская карта / СБП</h4><span>Чек об оплате</span></div>
+      <div class="paymethod selected" data-m="crypto" onclick="selectPayMethod('crypto')">
+        <div class="pic">🤖</div>
+        <div class="pn"><h4>Crypto Bot (Telegram)</h4><span>USDT / TON / BTC / СБП</span></div>
         <div class="radio-dot"></div>
-      </div>
-      <div class="paymethod" data-m="fast" onclick="selectPayMethod('fast')">
-        <div class="pic">⚡</div>
-        <div class="pn"><h4>Быстрый платёж</h4><span>Зачисление за секунды</span></div>
-        <div class="radio-dot"></div>
-      </div>
-      <div class="paymethod" data-m="crypto" onclick="selectPayMethod('crypto')">
-        <div class="pic">◆</div>
-        <div class="pn"><h4>Криптовалюта</h4><span>USDT / TON</span></div>
-        <div class="radio-dot"></div>
-      </div>
-
-      <div id="cryptoBlock" style="display:none; margin-top:2px;">
-        <div class="crypto-row">
-          <div class="crypto-chip selected" data-c="USDT" onclick="selectCrypto('USDT')">USDT</div>
-          <div class="crypto-chip" data-c="TON" onclick="selectCrypto('TON')">TON</div>
-        </div>
       </div>
 
       <button class="btn-primary" id="topupBtn" onclick="confirmTopup()">Выберите сумму</button>
@@ -748,10 +734,16 @@
 </div>
 
 <script>
+/* ---------------- SUPABASE INTEGRATION ---------------- */
+// Замените данные переменные на настройки вашего проекта Supabase (Project Settings -> API Keys)
+const SUPABASE_URL = 'https://your-project-id.supabase.co';
+const SUPABASE_ANON_KEY = 'your-anon-public-key';
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
 /* ---------------- STATE ---------------- */
 const state = {
-  userId: 'guest_' + Math.floor(100000 + Math.random() * 900000), // Дефолтный ID если открыто не в ТГ
-  balance: 0, // У всех по умолчанию 0 ₽
+  userId: 'guest_' + Math.floor(100000 + Math.random() * 900000),
+  balance: 0,
   orders: [],
   referral: { count: 0, earned: 0, code: '' },
   referrerId: null,
@@ -762,14 +754,14 @@ const state = {
   currentListItem: null,
   itemQty: 1,
   topupAmount: null,
-  payMethod: 'card',
+  payMethod: 'crypto',
   cryptoCoin: 'USDT',
   pendingPurchase: null,
   navStack: ['catalog']
 };
 
 /* ---------------- TELEGRAM PROFILE & USER DATA INIT ---------------- */
-function initTelegramUser() {
+async function initTelegramUser() {
   if (window.Telegram && window.Telegram.WebApp) {
     const tg = window.Telegram.WebApp;
     tg.ready();
@@ -798,68 +790,74 @@ function initTelegramUser() {
         document.getElementById('premiumUsername').placeholder = `@${user.username}`;
       }
 
-      // Обработка реферального старт-параметра вида ref_123456789
       const startParam = tg.initDataUnsafe?.start_param;
       if (startParam && startParam.startsWith('ref_')) {
         const refId = startParam.replace('ref_', '');
         if (refId !== state.userId) {
           state.referrerId = refId;
-          let myRefBy = localStorage.getItem(`user_${state.userId}_referrer`);
-          if (!myRefBy) {
-            localStorage.setItem(`user_${state.userId}_referrer`, refId);
-            // Увеличиваем счетчик у пригласившего
-            let refStats = JSON.parse(localStorage.getItem(`user_${refId}_refstats`) || '{"count":0,"earned":0}');
-            refStats.count += 1;
-            localStorage.setItem(`user_${refId}_refstats`, JSON.stringify(refStats));
-          }
         }
       }
     }
-  }
-
-  // Загружаем сохраненный реферер если уже записан
-  if (!state.referrerId) {
-    state.referrerId = localStorage.getItem(`user_${state.userId}_referrer`);
   }
 
   // Генерация реферальной ссылки по ID
   state.referral.code = `https://t.me/your_bot?start=ref_${state.userId}`;
   document.getElementById('refLinkText').textContent = state.referral.code;
 
-  // Загрузка персонального баланса, заказов и рефералов по ID
-  loadUserData();
+  // Загружаем данные пользователя из Supabase
+  await loadUserData();
 }
 
-function loadUserData() {
-  // Загрузка персонального баланса (по умолчанию 0)
-  const savedBalance = localStorage.getItem(`user_${state.userId}_balance`);
-  state.balance = savedBalance ? parseFloat(savedBalance) : 0;
+async function loadUserData() {
+  if (!supabase) return;
 
-  // Загрузка персональных заказов
-  const savedOrders = localStorage.getItem(`user_${state.userId}_orders`);
-  state.orders = savedOrders ? JSON.parse(savedOrders) : [];
+  try {
+    // 1. Читаем или создаем профиль пользователя в Supabase
+    let { data: profile, error } = await supabase
+      .from('profiles')
+      .select('balance, referrer_id')
+      .eq('id', state.userId)
+      .single();
 
-  // Загрузка статистики реферальной системы
-  const savedRefStats = localStorage.getItem(`user_${state.userId}_refstats`);
-  if (savedRefStats) {
-    const stats = JSON.parse(savedRefStats);
-    state.referral.count = stats.count || 0;
-    state.referral.earned = stats.earned || 0;
+    if (error && error.code === 'PGRST116') {
+      // Пользователь новый — создаем запись
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .insert({ id: state.userId, balance: 0, referrer_id: state.referrerId })
+        .select()
+        .single();
+      profile = newProfile;
+    }
+
+    if (profile) {
+      state.balance = Number(profile.balance || 0);
+    }
+
+    // 2. Получаем список заказов пользователя
+    const { data: dbOrders } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('user_id', state.userId)
+      .order('created_at', { ascending: false });
+
+    if (dbOrders) {
+      state.orders = dbOrders.map(o => ({
+        id: 'KG-' + o.invoice_id,
+        cat: 'other',
+        glyph: '🧾',
+        title: `Пополнение баланса`,
+        date: new Date(o.created_at).toLocaleDateString('ru-RU'),
+        price: Number(o.amount),
+        status: o.status === 'paid' ? 'Выполнен' : 'В процессе'
+      }));
+    }
+
+  } catch (err) {
+    console.error('Ошибка загрузки Supabase:', err);
   }
 
   renderBalance();
   renderOrders();
-  document.getElementById('refCount').textContent = state.referral.count;
-  document.getElementById('refEarned').textContent = rub(state.referral.earned);
-}
-
-function saveUserData() {
-  localStorage.setItem(`user_${state.userId}_balance`, state.balance.toString());
-  localStorage.setItem(`user_${state.userId}_orders`, JSON.stringify(state.orders));
-  localStorage.setItem(`user_${state.userId}_refstats`, JSON.stringify({
-    count: state.referral.count,
-    earned: state.referral.earned
-  }));
 }
 
 /* ---------------- PRODUCT CONFIG ---------------- */
@@ -1140,9 +1138,6 @@ function attemptBuy(type){
   pushView('checkout', {sub:true, title:'Подтверждение'});
 }
 
-function toKopecks(rub){ return Math.round(rub * 100); }
-function fromKopecks(k){ return Math.round(k) / 100; }
-
 function receiptHTML(p, id, stamped){
   const balanceBefore = state.balance;
   const balanceAfter = balanceBefore - p.price;
@@ -1177,49 +1172,38 @@ function renderCheckoutReceipt(p){
   }
 }
 
-function confirmPurchase(){
+async function confirmPurchase(){
   const p = state.pendingPurchase;
-  const balanceKop = toKopecks(state.balance);
-  const priceKop = toKopecks(p.price);
-  if(balanceKop < priceKop){
-    showTopupPrompt(fromKopecks(priceKop - balanceKop));
+  if(state.balance < p.price){
+    showToast('Недостаточно средств');
     return;
   }
   
-  // Списание средств
-  state.balance = fromKopecks(balanceKop - priceKop);
-  
-  // Начисление 1% рефереру (по ID)
-  if (state.referrerId) {
-    const bonus = Math.round(p.price * 0.01 * 100) / 100; // 1% от покупки
-    if (bonus > 0) {
-      let refBal = parseFloat(localStorage.getItem(`user_${state.referrerId}_balance`) || '0');
-      let refStats = JSON.parse(localStorage.getItem(`user_${state.referrerId}_refstats`) || '{"count":1,"earned":0}');
+  // Списание средств в Supabase
+  const newBalance = state.balance - p.price;
+  if(supabase) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ balance: newBalance })
+      .eq('id', state.userId);
       
-      refBal += bonus;
-      refStats.earned += bonus;
-
-      localStorage.setItem(`user_${state.referrerId}_balance`, refBal.toString());
-      localStorage.setItem(`user_${state.referrerId}_refstats`, JSON.stringify(refStats));
+    if (error) {
+      showToast('Ошибка при списании баланса');
+      return;
     }
   }
 
+  state.balance = newBalance;
   const id = genId();
   state.orders.unshift({
     id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
   });
-  
-  saveUserData();
+
   renderBalance();
 
   document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
   state.navStack = ['catalog','success'];
   showView('success', {sub:true, title:'Готово'});
-}
-
-function showTopupPrompt(missing){
-  showToast('Недостаточно средств — не хватает ' + rub(missing));
-  setTimeout(()=>openTopup(), 500);
 }
 
 /* ---------------- ORDERS ---------------- */
@@ -1249,16 +1233,10 @@ function copyRef(){
   showToast('Реферальная ссылка скопирована');
 }
 function activatePromo(){
-  const val = document.getElementById('promoInput').value.trim();
-  if(!val){ showToast('Введите промокод'); return; }
-  state.balance += 50;
-  saveUserData();
-  renderBalance();
-  document.getElementById('promoInput').value = '';
-  showToast('Промокод активирован: +50 ₽');
+  showToast('Промокод не найден');
 }
 
-/* ---------------- TOP-UP ---------------- */
+/* ---------------- TOP-UP (Crypto Bot via Supabase) ---------------- */
 const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
 function renderTopupChips(){
   const grid = document.getElementById('topupChips');
@@ -1284,13 +1262,6 @@ function selectTopupCustom(){
 }
 function selectPayMethod(m){
   state.payMethod = m;
-  document.querySelectorAll('.paymethod').forEach(p=>p.classList.toggle('selected', p.dataset.m===m));
-  document.getElementById('cryptoBlock').style.display = m==='crypto' ? 'block' : 'none';
-  updateTopupBtn();
-}
-function selectCrypto(c){
-  state.cryptoCoin = c;
-  document.querySelectorAll('.crypto-chip').forEach(el=>el.classList.toggle('selected', el.dataset.c===c));
 }
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
@@ -1310,13 +1281,38 @@ function openTopup(){
   updateTopupBtn();
   pushView('topup', {sub:true, title:'Пополнение баланса'});
 }
-function confirmTopup(){
+
+async function confirmTopup(){
   if(!state.topupAmount) return;
-  state.balance += state.topupAmount;
-  saveUserData();
-  renderBalance();
-  showToast('Баланс пополнен на ' + rub(state.topupAmount));
-  setTimeout(()=>{ goBack(); }, 450);
+  const btn = document.getElementById('topupBtn');
+  btn.textContent = 'Создаём счёт...';
+  btn.classList.add('disabled');
+
+  try {
+    // Вызов Edge Function `create-invoice` из Supabase
+    const { data, error } = await supabase.functions.invoke('create-invoice', {
+      body: { 
+        userId: state.userId, 
+        amountRub: state.topupAmount 
+      }
+    });
+
+    if (error || !data?.pay_url) {
+      throw new Error(error?.message || 'Не удалось получить ссылку');
+    }
+
+    // Перенаправляем пользователя на оплату счета в Telegram Crypto Bot
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(data.pay_url);
+    } else {
+      window.location.href = data.pay_url;
+    }
+
+  } catch (err) {
+    showToast('Ошибка: ' + err.message);
+  } finally {
+    updateTopupBtn();
+  }
 }
 
 /* ---------------- SUPPORT / TICKET / RULES ---------------- */
