@@ -161,6 +161,7 @@
     cursor:pointer; position:relative; overflow:hidden;
     transition:border-color .15s, transform .15s, box-shadow .15s;
     box-shadow:var(--shadow-card);
+    touch-action: manipulation;
   }
   .cat-card:active{transform:scale(.97);}
   .cat-card:hover{border-color:rgba(124,92,240,.4); box-shadow:var(--shadow-lift); transform:translateY(-2px);}
@@ -185,6 +186,7 @@
     border-radius:var(--radius-sm); padding:12px 6px;
     text-align:center; cursor:pointer; transition:all .12s;
     box-shadow:var(--shadow-card);
+    touch-action: manipulation;
   }
   .chip:active{transform:scale(.95);}
   .chip .amt{font-family:var(--font-mono); font-weight:600; font-size:14px;}
@@ -217,6 +219,7 @@
     border-radius:var(--radius-md); padding:12px 13px; margin-bottom:8px;
     box-shadow:var(--shadow-card); transition:transform .12s;
     cursor:pointer;
+    touch-action: manipulation;
   }
   .prod-row:active{transform:scale(.98);}
   .prod-row .glyph{
@@ -257,12 +260,14 @@
     background:var(--grad-brand); color:#fff; font-family:var(--font-body); font-weight:600;
     font-size:14.5px; padding:14px; cursor:pointer; transition:filter .1s, transform .1s;
     box-shadow:0 6px 20px rgba(124,92,240,.35);
+    touch-action: manipulation;
   }
   .btn-primary:active{transform:scale(.98); filter:brightness(.95);}
   .btn-primary.disabled{background:var(--surface-3); color:var(--text-faint); cursor:default; box-shadow:none; pointer-events:none;}
   .btn-secondary{
     width:100%; margin-top:10px; border:1px solid var(--border); border-radius:var(--radius-sm);
     background:transparent; color:var(--text); font-weight:600; font-size:13.5px; padding:12px; cursor:pointer;
+    touch-action: manipulation;
   }
 
   /* ---------- Receipt ---------- */
@@ -397,7 +402,7 @@
     border-top:1px solid var(--border);
     display:flex; padding:9px 12px calc(9px + env(safe-area-inset-bottom));
   }
-  .tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; color:var(--text-faint); padding:4px 0;}
+  .tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; color:var(--text-faint); padding:4px 0; touch-action: manipulation;}
   .tab .ic{font-size:19px; line-height:1;}
   .tab span{font-size:10px; font-weight:600;}
   .tab.active{color:var(--accent-2);}
@@ -737,8 +742,15 @@ const supabase = (window.supabase && SUPABASE_URL !== 'https://your-project-id.s
   : null;
 
 /* ---------------- STATE ---------------- */
+// Сохраняем случайный ID гостя в localStorage, чтобы при перезагрузке вне TG не терять прогресс
+let savedGuestId = localStorage.getItem('kitsaigg_guest_id');
+if (!savedGuestId) {
+  savedGuestId = 'guest_' + Math.floor(100000 + Math.random() * 900000);
+  localStorage.setItem('kitsaigg_guest_id', savedGuestId);
+}
+
 const state = {
-  userId: 'guest_' + Math.floor(100000 + Math.random() * 900000),
+  userId: savedGuestId,
   balance: 0,
   orders: [],
   referral: { count: 0, earned: 0, code: '' },
@@ -755,13 +767,18 @@ const state = {
 
 /* ---------------- TELEGRAM PROFILE & USER DATA INIT ---------------- */
 async function initTelegramUser() {
+  let isTg = false;
   if (window.Telegram && window.Telegram.WebApp) {
     const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+    // Обязательная инициализация интерфейса WebApp
+    try {
+      tg.ready();
+      tg.expand();
+    } catch(e) {}
 
     const user = tg.initDataUnsafe?.user;
     if (user && user.id) {
+      isTg = true;
       state.userId = user.id.toString();
 
       const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
@@ -789,6 +806,22 @@ async function initTelegramUser() {
         if (refId !== state.userId) {
           state.referrerId = refId;
         }
+      }
+    }
+  }
+
+  // Если открыто вне Telegram (обычный браузер)
+  if (!isTg) {
+    document.getElementById('userName').textContent = 'Гость';
+    document.getElementById('userHandle').textContent = `ID: ${state.userId}`;
+    
+    // Попытка получить ref из URL в браузере (?ref=123)
+    const urlParams = new URLSearchParams(window.location.search);
+    const refParam = urlParams.get('ref') || urlParams.get('start');
+    if (refParam) {
+      const refId = refParam.replace('ref_', '');
+      if (refId !== state.userId) {
+        state.referrerId = refId;
       }
     }
   }
@@ -911,6 +944,17 @@ function genId(){ return 'KG-' + Math.floor(70000+Math.random()*29999); }
 function renderBalance(){
   document.getElementById('balanceTop').textContent = rub(state.balance);
   document.getElementById('balanceProfile').textContent = rub(state.balance);
+}
+
+/* ---------------- UNIVERSAL LINK OPENER ---------------- */
+function openExternalLink(url) {
+  if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openTelegramLink === 'function' && url.includes('t.me')) {
+    window.Telegram.WebApp.openTelegramLink(url);
+  } else if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === 'function' && !url.includes('t.me')) {
+    window.Telegram.WebApp.openLink(url);
+  } else {
+    window.open(url, '_blank');
+  }
 }
 
 /* ---------------- NAV ---------------- */
@@ -1224,9 +1268,35 @@ function filterOrders(f){
 
 /* ---------------- PROFILE / REFERRAL / PROMO ---------------- */
 function copyRef(){
-  navigator.clipboard?.writeText(state.referral.code).catch(()=>{});
-  showToast('Реферальная ссылка скопирована');
+  const textToCopy = state.referral.code;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      showToast('Реферальная ссылка скопирована');
+    }).catch(() => {
+      fallbackCopyTextToClipboard(textToCopy);
+    });
+  } else {
+    fallbackCopyTextToClipboard(textToCopy);
+  }
 }
+
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    showToast('Реферальная ссылка скопирована');
+  } catch (err) {
+    showToast('Не удалось скопировать');
+  }
+  document.body.removeChild(textArea);
+}
+
 function activatePromo(){
   showToast('Промокод не найден');
 }
@@ -1306,11 +1376,7 @@ async function confirmTopup(){
       throw new Error(error?.message || 'Не удалось получить ссылку');
     }
 
-    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(data.pay_url);
-    } else {
-      window.open(data.pay_url, '_blank');
-    }
+    openExternalLink(data.pay_url);
 
   } catch (err) {
     showToast('Ошибка: ' + err.message);
@@ -1335,11 +1401,7 @@ function submitTicket(){
 }
 function openSupportTelegram(){
   const url = 'https://t.me/your_support_bot';
-  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
-    window.Telegram.WebApp.openTelegramLink(url);
-  } else {
-    window.open(url, '_blank');
-  }
+  openExternalLink(url);
 }
 
 /* ---------------- TOAST ---------------- */
