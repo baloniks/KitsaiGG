@@ -309,7 +309,7 @@
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
     padding:13px 14px; margin-bottom:9px; display:flex; align-items:center; gap:12px;
   }
-  .order-item .glyph{width:36px; height:36px; border-radius:9px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;}
+  .order-item .glyph{width:36px; height:36px; border-radius:99px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;}
   .order-item .meta{flex:1; min-width:0;}
   .order-item .meta h4{font-size:13px; font-weight:600;}
   .order-item .meta span{font-size:10.5px; color:var(--text-faint); font-family:var(--font-mono);}
@@ -625,13 +625,13 @@
 
       <div class="ref-card">
         <h4>Реферальная программа</h4>
-        <p>Приглашайте друзей и получайте 10% с каждого их пополнения баланса — начисляется автоматически.</p>
+        <p>Приглашайте друзей и получайте 1% с каждой их покупки — начисляется автоматически.</p>
         <div class="ref-stats">
           <div class="ref-stat"><div class="n" id="refCount">0</div><div class="l">рефералов</div></div>
           <div class="ref-stat"><div class="n" id="refEarned">0 ₽</div><div class="l">заработано</div></div>
         </div>
         <div class="ref-link-row">
-          <span id="refLinkText">kitsaigg.gg/r/kg_4471</span>
+          <span id="refLinkText">Загрузка...</span>
           <button onclick="copyRef()">Копировать</button>
         </div>
       </div>
@@ -688,7 +688,7 @@
         <p style="color:var(--text); font-weight:600; margin-bottom:6px;">3. Возвраты</p>
         <p style="margin-bottom:16px;">Если товар не пришёл в течение 30 минут — откройте тикет с номером заказа, средства вернутся на баланс после проверки.</p>
         <p style="color:var(--text); font-weight:600; margin-bottom:6px;">4. Реферальная программа</p>
-        <p>Начисления действуют только на пополнения приглашённых, накопленное вознаграждение не сгорает.</p>
+        <p>Начисления 1% действуют с покупок всех зарегистрировавшихся по вашей ссылке пользователей.</p>
       </div>
       <button class="btn-secondary" onclick="goBack()">Назад</button>
     </section>
@@ -750,26 +750,25 @@
 <script>
 /* ---------------- STATE ---------------- */
 const state = {
-  balance: 340,
-  orders: [
-    {id:'KG-77291', cat:'stars', glyph:'⭐', title:'Telegram Stars · 250', date:'24 авг, 14:02', price:450, status:'Выполнен'},
-    {id:'KG-77118', cat:'other', glyph:'🎁', title:'Steam Wallet 1 000 ₽', date:'19 авг, 09:41', price:1000, status:'Выполнен'},
-  ],
-  referral: {count:3, earned:210},
-  currentCategory:null,
-  rateSelected:null,
-  rateCustom:false,
-  premiumSelected:null,
-  currentListItem:null,
-  itemQty:1,
-  topupAmount:null,
-  payMethod:'card',
-  cryptoCoin:'USDT',
-  pendingPurchase:null,
-  navStack:['catalog']
+  userId: 'guest_' + Math.floor(100000 + Math.random() * 900000), // Дефолтный ID если открыто не в ТГ
+  balance: 0, // У всех по умолчанию 0 ₽
+  orders: [],
+  referral: { count: 0, earned: 0, code: '' },
+  referrerId: null,
+  currentCategory: null,
+  rateSelected: null,
+  rateCustom: false,
+  premiumSelected: null,
+  currentListItem: null,
+  itemQty: 1,
+  topupAmount: null,
+  payMethod: 'card',
+  cryptoCoin: 'USDT',
+  pendingPurchase: null,
+  navStack: ['catalog']
 };
 
-/* ---------------- TELEGRAM PROFILE INIT ---------------- */
+/* ---------------- TELEGRAM PROFILE & USER DATA INIT ---------------- */
 function initTelegramUser() {
   if (window.Telegram && window.Telegram.WebApp) {
     const tg = window.Telegram.WebApp;
@@ -777,14 +776,15 @@ function initTelegramUser() {
     tg.expand();
 
     const user = tg.initDataUnsafe?.user;
-    if (user) {
+    if (user && user.id) {
+      state.userId = user.id.toString();
+
       const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
       const username = user.username ? `@${user.username}` : `ID: ${user.id}`;
       
       document.getElementById('userName').textContent = fullName;
       document.getElementById('userHandle').textContent = username;
 
-      // Устанавливаем аватар (или первую букву имени)
       const avatarEl = document.getElementById('userAvatar');
       if (user.photo_url) {
         avatarEl.style.backgroundImage = `url('${user.photo_url}')`;
@@ -793,13 +793,73 @@ function initTelegramUser() {
         avatarEl.textContent = user.first_name ? user.first_name[0].toUpperCase() : 'Ki';
       }
 
-      // Автоматически подставляем username в поля ввода
       if (user.username) {
         document.getElementById('rateUsername').placeholder = `@${user.username}`;
         document.getElementById('premiumUsername').placeholder = `@${user.username}`;
       }
+
+      // Обработка реферального старт-параметра вида ref_123456789
+      const startParam = tg.initDataUnsafe?.start_param;
+      if (startParam && startParam.startsWith('ref_')) {
+        const refId = startParam.replace('ref_', '');
+        if (refId !== state.userId) {
+          state.referrerId = refId;
+          let myRefBy = localStorage.getItem(`user_${state.userId}_referrer`);
+          if (!myRefBy) {
+            localStorage.setItem(`user_${state.userId}_referrer`, refId);
+            // Увеличиваем счетчик у пригласившего
+            let refStats = JSON.parse(localStorage.getItem(`user_${refId}_refstats`) || '{"count":0,"earned":0}');
+            refStats.count += 1;
+            localStorage.setItem(`user_${refId}_refstats`, JSON.stringify(refStats));
+          }
+        }
+      }
     }
   }
+
+  // Загружаем сохраненный реферер если уже записан
+  if (!state.referrerId) {
+    state.referrerId = localStorage.getItem(`user_${state.userId}_referrer`);
+  }
+
+  // Генерация реферальной ссылки по ID
+  state.referral.code = `https://t.me/your_bot?start=ref_${state.userId}`;
+  document.getElementById('refLinkText').textContent = state.referral.code;
+
+  // Загрузка персонального баланса, заказов и рефералов по ID
+  loadUserData();
+}
+
+function loadUserData() {
+  // Загрузка персонального баланса (по умолчанию 0)
+  const savedBalance = localStorage.getItem(`user_${state.userId}_balance`);
+  state.balance = savedBalance ? parseFloat(savedBalance) : 0;
+
+  // Загрузка персональных заказов
+  const savedOrders = localStorage.getItem(`user_${state.userId}_orders`);
+  state.orders = savedOrders ? JSON.parse(savedOrders) : [];
+
+  // Загрузка статистики реферальной системы
+  const savedRefStats = localStorage.getItem(`user_${state.userId}_refstats`);
+  if (savedRefStats) {
+    const stats = JSON.parse(savedRefStats);
+    state.referral.count = stats.count || 0;
+    state.referral.earned = stats.earned || 0;
+  }
+
+  renderBalance();
+  renderOrders();
+  document.getElementById('refCount').textContent = state.referral.count;
+  document.getElementById('refEarned').textContent = rub(state.referral.earned);
+}
+
+function saveUserData() {
+  localStorage.setItem(`user_${state.userId}_balance`, state.balance.toString());
+  localStorage.setItem(`user_${state.userId}_orders`, JSON.stringify(state.orders));
+  localStorage.setItem(`user_${state.userId}_refstats`, JSON.stringify({
+    count: state.referral.count,
+    earned: state.referral.earned
+  }));
 }
 
 /* ---------------- PRODUCT CONFIG ---------------- */
@@ -1125,12 +1185,33 @@ function confirmPurchase(){
     showTopupPrompt(fromKopecks(priceKop - balanceKop));
     return;
   }
+  
+  // Списание средств
   state.balance = fromKopecks(balanceKop - priceKop);
-  renderBalance();
+  
+  // Начисление 1% рефереру (по ID)
+  if (state.referrerId) {
+    const bonus = Math.round(p.price * 0.01 * 100) / 100; // 1% от покупки
+    if (bonus > 0) {
+      let refBal = parseFloat(localStorage.getItem(`user_${state.referrerId}_balance`) || '0');
+      let refStats = JSON.parse(localStorage.getItem(`user_${state.referrerId}_refstats`) || '{"count":1,"earned":0}');
+      
+      refBal += bonus;
+      refStats.earned += bonus;
+
+      localStorage.setItem(`user_${state.referrerId}_balance`, refBal.toString());
+      localStorage.setItem(`user_${state.referrerId}_refstats`, JSON.stringify(refStats));
+    }
+  }
+
   const id = genId();
   state.orders.unshift({
     id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
   });
+  
+  saveUserData();
+  renderBalance();
+
   document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
   state.navStack = ['catalog','success'];
   showView('success', {sub:true, title:'Готово'});
@@ -1164,13 +1245,14 @@ function filterOrders(f){
 
 /* ---------------- PROFILE / REFERRAL / PROMO ---------------- */
 function copyRef(){
-  navigator.clipboard?.writeText('https://kitsaigg.gg/r/kg_4471').catch(()=>{});
+  navigator.clipboard?.writeText(state.referral.code).catch(()=>{});
   showToast('Реферальная ссылка скопирована');
 }
 function activatePromo(){
   const val = document.getElementById('promoInput').value.trim();
   if(!val){ showToast('Введите промокод'); return; }
   state.balance += 50;
+  saveUserData();
   renderBalance();
   document.getElementById('promoInput').value = '';
   showToast('Промокод активирован: +50 ₽');
@@ -1231,6 +1313,7 @@ function openTopup(){
 function confirmTopup(){
   if(!state.topupAmount) return;
   state.balance += state.topupAmount;
+  saveUserData();
   renderBalance();
   showToast('Баланс пополнен на ' + rub(state.topupAmount));
   setTimeout(()=>{ goBack(); }, 450);
@@ -1263,10 +1346,6 @@ function showToast(msg){
 
 /* ---------------- INIT ---------------- */
 initTelegramUser();
-renderBalance();
-renderOrders();
-document.getElementById('refCount').textContent = state.referral.count;
-document.getElementById('refEarned').textContent = rub(state.referral.earned);
 </script>
 </body>
 </html>
