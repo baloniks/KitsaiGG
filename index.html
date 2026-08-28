@@ -337,7 +337,12 @@
   .order-item .right .price{font-family:var(--font-mono); font-weight:600; font-size:13px;}
   .badge{font-size:9.5px; padding:3px 7px; border-radius:999px; background:var(--green-soft); color:var(--green); font-weight:600; letter-spacing:.3px; display:inline-block; margin-top:3px;}
 
-  .filter-row{display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; scrollbar-width:none;}
+  .filter-row{
+    display:flex; flex-wrap:nowrap; gap:8px; margin-bottom:16px;
+    overflow-x:auto; overflow-y:hidden; scrollbar-width:none;
+    -webkit-overflow-scrolling:touch; touch-action:pan-x;
+    margin-left:-16px; margin-right:-16px; padding-left:16px; padding-right:16px;
+  }
   .filter-row::-webkit-scrollbar{display:none;}
   .filter-row.sub-row{margin-top:-6px; margin-bottom:18px;}
   .filter-row.sub-row .filter-pill{font-size:11px; padding:6px 12px; color:var(--text-faint);}
