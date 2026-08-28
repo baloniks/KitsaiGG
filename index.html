@@ -906,7 +906,8 @@ function buildProductConfigs(rows){
         options: Array.isArray(row.options) ? row.options : [],
         fieldLabel: row.field_label || 'Юзернейм получателя',
         hint: row.hint || '',
-        qtyLabel: row.qty_label || 'Количество'
+        qtyLabel: row.qty_label || 'Количество',
+        minQty: row.min_qty != null ? Number(row.min_qty) : null
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1155,8 +1156,11 @@ function renderRateProduct(cat){
   grid.appendChild(customChip);
 
   document.getElementById('rateCustomWrap').style.display = 'none';
-  document.getElementById('rateCustomLabel').textContent = 'Своё количество (' + cfg.unit + ')';
-  document.getElementById('rateCustomInput').value = '';
+  document.getElementById('rateCustomLabel').textContent = 'Своё количество (' + cfg.unit + ')'
+    + (cfg.minQty ? ', минимум ' + cfg.minQty.toLocaleString('ru-RU') : '');
+  const customInput = document.getElementById('rateCustomInput');
+  customInput.value = '';
+  customInput.min = cfg.minQty || 1;
 
   updateRateSummary();
 }
@@ -1181,7 +1185,8 @@ function selectCustomChip(cfg){
 function applyCustomRateInput(cfg){
   const input = document.getElementById('rateCustomInput');
   const val = parseInt(input.value, 10);
-  state.rateSelected = (Number.isFinite(val) && val > 0) ? val : null;
+  const min = cfg.minQty || 1;
+  state.rateSelected = (Number.isFinite(val) && val >= min) ? val : null;
   updateRateSummary();
 }
 
