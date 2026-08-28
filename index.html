@@ -286,6 +286,26 @@
   }
   .receipt .rtotal .lbl{font-size:12px; color:var(--text-muted);}
   .receipt .rtotal .val{font-size:18px; font-weight:700;}
+  .kcoin-box{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
+    padding:12px 14px; margin-top:10px;
+  }
+  .kcoin-toggle{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text); cursor:pointer; user-select:none;}
+  .kcoin-toggle input{width:18px; height:18px; accent-color:var(--gold); flex:none;}
+  .kcoin-toggle .muted{color:var(--text-faint); font-size:12px;}
+  .kcoin-amount-row{display:flex; align-items:center; gap:8px; margin-top:10px;}
+  .kcoin-amount-row button{
+    width:32px; height:32px; border-radius:var(--radius-sm); border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text); font-size:16px; line-height:1; cursor:pointer;
+  }
+  .kcoin-amount-row button:active{transform:scale(.95);}
+  .kcoin-amount-row input{
+    flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+    color:var(--text); font-family:var(--font-mono); font-size:14px; text-align:center; padding:7px 4px;
+  }
+  .kcoin-amount-row .kmax{
+    background:var(--gold-soft); border-color:transparent; color:var(--gold); font-size:12px; width:auto; padding:0 10px; font-weight:600;
+  }
   .receipt .stamp{
     margin-top:14px; text-align:center; font-size:10.5px; letter-spacing:2px; color:var(--green);
     border:1px solid var(--green); border-radius:6px; padding:5px; transform:rotate(-1deg);
@@ -566,6 +586,18 @@
       <div class="receipt-wrap">
         <div class="receipt" id="checkoutReceipt"></div>
       </div>
+      <div class="kcoin-box" id="kcoinBox" style="display:none;">
+        <label class="kcoin-toggle">
+          <input type="checkbox" id="kcoinToggle">
+          <span>Списать KCoin <span class="muted">(доступно <span id="kcoinAvail">0</span> KC)</span></span>
+        </label>
+        <div class="kcoin-amount-row" id="kcoinAmountRow" style="display:none;">
+          <button type="button" id="kcoinMinus">−</button>
+          <input type="number" id="kcoinAmountInput" min="0" step="1" inputmode="numeric">
+          <button type="button" id="kcoinPlus">+</button>
+          <button type="button" class="kmax" id="kcoinMaxBtn">Макс</button>
+        </div>
+      </div>
       <button class="btn-primary" id="checkoutConfirmBtn">Подтвердить и оплатить</button>
       <button class="btn-secondary" id="btnCheckoutCancel">Отменить</button>
     </section>
@@ -755,6 +787,7 @@ const state = {
   userId: savedGuestId,
   balance: 0,
   kcoinBalance: 0,
+  pendingKcoinToUse: null, // сколько KCoin списываем в текущем оформлении заказа
   orders: [],
   referral: { count: 0, earned: 0, code: '' },
   referrerId: null,
@@ -1080,8 +1113,10 @@ function attemptBuy(type){
 }
 
 function receiptHTML(p, id, stamped){
+  const kcoinUsed = stamped ? (p.kcoinUsedFinal ?? 0) : Math.max(0, Math.min(state.pendingKcoinToUse||0, p.price, state.kcoinBalance));
+  const rubDue = Math.max(0, p.price - kcoinUsed);
   const balanceBefore = state.balance;
-  const balanceAfter = balanceBefore - p.price;
+  const balanceAfter = balanceBefore - rubDue;
   return `
     <div class="rhead">
       <div class="k">KitsaiGG</div>
@@ -1089,10 +1124,13 @@ function receiptHTML(p, id, stamped){
     </div>
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${p.title}</span></div>
     <div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${p.recipient}</span></div>
-    <div class="receipt-row"><span>Способ оплаты</span><span class="fill"></span><span class="value">Баланс KitsaiGG</span></div>
+    <div class="receipt-row"><span>Способ оплаты</span><span class="fill"></span><span class="value">${kcoinUsed>0 ? (rubDue>0 ? 'Баланс + KCoin' : 'KCoin') : 'Баланс KitsaiGG'}</span></div>
+    ${kcoinUsed>0 ? `
+    <div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${kcoinUsed.toLocaleString('ru-RU')} KC</span></div>
+    ` : ''}
     ${!stamped ? `
     <div class="receipt-row"><span>Баланс сейчас</span><span class="fill"></span><span class="value">${rub(balanceBefore)}</span></div>
-    <div class="receipt-row"><span>Спишется</span><span class="fill"></span><span class="value">− ${rub(p.price)}</span></div>
+    <div class="receipt-row"><span>Спишется с баланса</span><span class="fill"></span><span class="value">− ${rub(rubDue)}</span></div>
     <div class="receipt-row"><span>Останется</span><span class="fill"></span><span class="value" style="color:${balanceAfter<0?'var(--danger)':'var(--green)'}">${rub(Math.max(balanceAfter,0))}${balanceAfter<0?' · не хватает':''}</span></div>
     ` : ''}
     <div class="rtotal"><span class="lbl">Итого к оплате</span><span class="val">${rub(p.price)}</span></div>
@@ -1101,16 +1139,108 @@ function receiptHTML(p, id, stamped){
   `;
 }
 
-function renderCheckoutReceipt(p){
-  document.getElementById('checkoutReceipt').innerHTML = receiptHTML(p, genId(), false);
+// Считаем максимум KCoin, которым можно закрыть покупку: не больше цены и не больше баланса KCoin.
+function maxKcoinFor(p){
+  return Math.max(0, Math.min(Math.floor(p.price), Math.floor(state.kcoinBalance || 0)));
+}
+
+// Номер чека фиксируем один раз на весь чекаут, чтобы он не "прыгал" при пересчёте KCoin.
+function checkoutId(p){
+  if(!p.checkoutReceiptId) p.checkoutReceiptId = genId();
+  return p.checkoutReceiptId;
+}
+
+function renderKcoinBox(p){
+  const box = document.getElementById('kcoinBox');
+  const avail = document.getElementById('kcoinAvail');
+  const toggle = document.getElementById('kcoinToggle');
+  const row = document.getElementById('kcoinAmountRow');
+  const input = document.getElementById('kcoinAmountInput');
+  const max = maxKcoinFor(p);
+
+  if(max <= 0){
+    box.style.display = 'none';
+    state.pendingKcoinToUse = 0;
+    return;
+  }
+
+  box.style.display = 'block';
+  avail.textContent = Math.floor(state.kcoinBalance).toLocaleString('ru-RU');
+
+  // По умолчанию предлагаем списать максимум доступного KCoin — это и есть "предложить списать".
+  if(state.pendingKcoinToUse == null){
+    state.pendingKcoinToUse = max;
+  }
+  state.pendingKcoinToUse = Math.max(0, Math.min(state.pendingKcoinToUse, max));
+
+  toggle.checked = state.pendingKcoinToUse > 0;
+  row.style.display = toggle.checked ? 'flex' : 'none';
+  input.max = max;
+  input.min = 0;
+  input.value = state.pendingKcoinToUse;
+
+  const updateAndRerender = () => {
+    document.getElementById('checkoutReceipt').innerHTML = receiptHTML(p, checkoutId(p), false);
+    updateConfirmButton(p);
+  };
+
+  toggle.onchange = () => {
+    if(toggle.checked){
+      state.pendingKcoinToUse = state.pendingKcoinToUse > 0 ? state.pendingKcoinToUse : max;
+      row.style.display = 'flex';
+    } else {
+      state.pendingKcoinToUse = 0;
+      row.style.display = 'none';
+    }
+    input.value = state.pendingKcoinToUse;
+    updateAndRerender();
+  };
+
+  input.oninput = () => {
+    let v = Math.floor(Number(input.value) || 0);
+    v = Math.max(0, Math.min(v, max));
+    state.pendingKcoinToUse = v;
+    updateAndRerender();
+  };
+
+  document.getElementById('kcoinMinus').onclick = () => {
+    state.pendingKcoinToUse = Math.max(0, (state.pendingKcoinToUse||0) - 1);
+    input.value = state.pendingKcoinToUse;
+    toggle.checked = state.pendingKcoinToUse > 0;
+    updateAndRerender();
+  };
+  document.getElementById('kcoinPlus').onclick = () => {
+    state.pendingKcoinToUse = Math.min(max, (state.pendingKcoinToUse||0) + 1);
+    input.value = state.pendingKcoinToUse;
+    toggle.checked = state.pendingKcoinToUse > 0;
+    updateAndRerender();
+  };
+  document.getElementById('kcoinMaxBtn').onclick = () => {
+    state.pendingKcoinToUse = max;
+    input.value = max;
+    toggle.checked = true;
+    updateAndRerender();
+  };
+}
+
+function updateConfirmButton(p){
   const btn = document.getElementById('checkoutConfirmBtn');
-  if(state.balance < p.price){
+  const kcoinUsed = Math.max(0, Math.min(state.pendingKcoinToUse||0, p.price, state.kcoinBalance));
+  const rubDue = Math.max(0, p.price - kcoinUsed);
+  if(state.balance < rubDue){
     btn.textContent = 'Недостаточно средств — пополнить';
     btn.onclick = () => openTopup();
   } else {
     btn.textContent = 'Подтвердить и оплатить';
     btn.onclick = confirmPurchase;
   }
+}
+
+function renderCheckoutReceipt(p){
+  state.pendingKcoinToUse = null; // сбрасываем при заходе на новый чек, дефолт выставит renderKcoinBox
+  document.getElementById('checkoutReceipt').innerHTML = receiptHTML(p, checkoutId(p), false);
+  renderKcoinBox(p);
+  updateConfirmButton(p);
 }
 
 async function confirmPurchase(){
@@ -1130,6 +1260,8 @@ async function confirmPurchase(){
     return;
   }
 
+  const kcoinToUse = Math.max(0, Math.min(Math.floor(state.pendingKcoinToUse||0), Math.floor(p.price), Math.floor(state.kcoinBalance||0)));
+
   try {
     const { data, error } = await supabaseClient.functions.invoke('create-order', {
       body: {
@@ -1137,7 +1269,8 @@ async function confirmPurchase(){
         category: p.cat,
         title: p.title,
         recipient: p.recipient,
-        price_rub: p.price
+        price_rub: p.price,
+        kcoin_to_use: kcoinToUse
       }
     });
 
@@ -1160,6 +1293,8 @@ async function confirmPurchase(){
     renderBalance();
 
     const id = data.order_id;
+    p.kcoinUsedFinal = Number(data.kcoin_used || 0); // сколько реально списал сервер — источник правды для чека
+    state.pendingKcoinToUse = 0;
     state.orders.unshift({
       id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
     });
