@@ -2,6 +2,9 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <title>KitsaiGG — цифровой магазин</title>
 
@@ -978,8 +981,15 @@ async function loadProducts(){
 function catalogItemPrice(entry){
   if(entry.type === 'rate'){
     const cfg = RATE_CONFIG[entry.key];
-    if(!cfg || !cfg.options.length) return 0;
-    return Math.round(Math.min(...cfg.options) * cfg.rate);
+    if(!cfg) return 0;
+    // Минимальное доступное количество: либо наименьший пресет из options,
+    // либо min_qty (для товаров с input_mode='input', где options пустой),
+    // либо большее из двух, если оба заданы — реальный минимум не может
+    // быть ниже min_qty, даже если самый маленький чип меньше.
+    let baseQty = cfg.options && cfg.options.length ? Math.min(...cfg.options) : null;
+    if(cfg.minQty != null) baseQty = baseQty != null ? Math.max(baseQty, cfg.minQty) : cfg.minQty;
+    if(baseQty == null) baseQty = 1;
+    return Math.round(baseQty * cfg.rate);
   }
   if(entry.type === 'premium'){
     return PREMIUM_PLANS.length ? Math.min(...PREMIUM_PLANS.map(p => p.price)) : 0;
