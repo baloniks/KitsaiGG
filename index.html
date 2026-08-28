@@ -805,52 +805,21 @@ const state = {
   navStack: ['catalog']
 };
 
-/* ---------------- PRODUCT CONFIG ---------------- */
-const RATE_CONFIG = {
-  stars: {
-    title:'Telegram Stars', rate:1.8, unit:'⭐',
-    options:[50,100,250,500,1000,2500],
-    fieldLabel:'Юзернейм получателя',
-    hint:'Аккаунт должен быть открыт для получения подарков от незнакомых пользователей.',
-    qtyLabel:'Количество звёзд'
-  },
-  robux: {
-    title:'Robux', rate:0.97, unit:'R$',
-    options:[80,170,400,800,1700,4500],
-    fieldLabel:'Никнейм в Roblox',
-    hint:'Зачисление через Gamepass — пароль от аккаунта не требуется.',
-    qtyLabel:'Количество Robux'
-  }
-};
+/* ---------------- PRODUCT CONFIG (загружается из таблицы products в Supabase) ---------------- */
+// Эти переменные раньше были захардкожены, теперь их заполняет loadProducts()
+// на основе строк из таблицы products. Структура (RATE_CONFIG/PREMIUM_PLANS/
+// LIST_CONFIG) сохранена специально — весь остальной код покупки (чипы,
+// чек, оформление) продолжает работать без изменений.
+let RATE_CONFIG = {};
+let PREMIUM_PLANS = [];
+let LIST_CONFIG = {};
 
-const PREMIUM_PLANS = [
-  {label:'1 месяц', months:1, price:449},
-  {label:'3 месяца', months:3, price:1199},
-  {label:'6 месяцев', months:6, price:2099},
-  {label:'12 месяцев', months:12, price:3499},
-];
-
-const LIST_CONFIG = {
-  keys: {
-    title:'Игровые ключи и валюта',
-    items:[
-      {id:'valorant-1000', glyph:'🔫', title:'Valorant Points · 1 000', sub:'Riot ID, без пароля', price:790},
-      {id:'valorant-2050', glyph:'🔫', title:'Valorant Points · 2 050', sub:'Riot ID, без пароля', price:1590},
-      {id:'fifa-4600', glyph:'⚽', title:'FIFA Points · 4 600', sub:'EA account', price:2990},
-      {id:'gta-online', glyph:'🚗', title:'GTA$ Online · 8 000 000', sub:'Steam / Rockstar', price:1290},
-      {id:'apex-2150', glyph:'🎯', title:'Apex Coins · 2 150', sub:'EA account', price:1490},
-      {id:'minecraft', glyph:'⛏️', title:'Minecraft Java + Bedrock', sub:'Ключ активации', price:1690},
-    ]
-  },
-  giftcards: {
-    title:'Подарочные карты',
-    items:[
-      {id:'steam-500', glyph:'🎮', title:'Steam Wallet · 500 ₽', sub:'Код активации RU', price:530},
-      {id:'steam-1000', glyph:'🎮', title:'Steam Wallet · 1 000 ₽', sub:'Код активации RU', price:1040},
-      {id:'gplay-500', glyph:'▶️', title:'Google Play · 500 ₽', sub:'Код активации RU', price:520},
-      {id:'appstore-1000', glyph:'🍎', title:'App Store / iTunes · 1 000 ₽', sub:'Код активации RU', price:1060},
-    ]
-  }
+// Человеко-читаемые заголовки для групп list-item товаров (используются как
+// заголовок экрана и в старом списочном представлении). Добавляя новую
+// группу через group_key в таблице products, впишите её название и сюда.
+const GROUP_TITLES = {
+  keys: 'Игровые ключи и валюта',
+  giftcards: 'Подарочные карты',
 };
 
 const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
@@ -885,50 +854,129 @@ const CATALOG_SUBCATEGORIES = {
 };
 
 // Единый список услуг для поиска и витрины каталога.
+// Раньше это был статичный массив, теперь его заполняет buildProductConfigs()
+// на основе строк, загруженных из таблицы products в Supabase (см. loadProducts()).
 // type:'rate'      → открывает выбор количества (Stars/Robux); key указывает на RATE_CONFIG
 // type:'premium'   → открывает выбор срока Telegram Premium
 // type:'list-item' → открывает карточку конкретного товара; listKey/itemId указывают на LIST_CONFIG
-// Чтобы добавить новую услугу — просто добавьте объект в этот массив
-// (и, если нужно, сам товар в RATE_CONFIG / LIST_CONFIG выше).
-const CATALOG_ITEMS = [
-  { title:'Telegram Stars', sub:'от 50 звёзд', glyph:'⭐',
-    category:'services', subcats:['telegram'], type:'rate', key:'stars' },
-  { title:'Telegram Premium', sub:'1–12 месяцев', glyph:'💎',
-    category:'services', subcats:['telegram'], type:'premium' },
+let CATALOG_ITEMS = [];
 
-  { title:'Robux', sub:'без верификации', glyph:'🟩',
-    category:'games', subcats:['mobile','pc','console','casual'], type:'rate', key:'robux' },
-  { title:'Valorant Points · 1 000', sub:'Riot ID, без пароля', glyph:'🔫',
-    category:'games', subcats:['pc','shooter'], type:'list-item', listKey:'keys', itemId:'valorant-1000' },
-  { title:'Valorant Points · 2 050', sub:'Riot ID, без пароля', glyph:'🔫',
-    category:'games', subcats:['pc','shooter'], type:'list-item', listKey:'keys', itemId:'valorant-2050' },
-  { title:'FIFA Points · 4 600', sub:'EA account', glyph:'⚽',
-    category:'games', subcats:['pc','console','other'], type:'list-item', listKey:'keys', itemId:'fifa-4600' },
-  { title:'GTA$ Online · 8 000 000', sub:'Steam / Rockstar', glyph:'🚗',
-    category:'games', subcats:['pc','console','other'], type:'list-item', listKey:'keys', itemId:'gta-online' },
-  { title:'Apex Coins · 2 150', sub:'EA account', glyph:'🎯',
-    category:'games', subcats:['pc','console','shooter'], type:'list-item', listKey:'keys', itemId:'apex-2150' },
-  { title:'Minecraft Java + Bedrock', sub:'Ключ активации', glyph:'⛏️',
-    category:'games', subcats:['pc','console','mobile','casual'], type:'list-item', listKey:'keys', itemId:'minecraft' },
+// Строка из таблицы products → внутренние структуры RATE_CONFIG/PREMIUM_PLANS/
+// LIST_CONFIG/CATALOG_ITEMS, которые использует остальной код приложения.
+// Ожидаемые колонки таблицы products (все, кроме id/type/title/category, могут
+// быть NULL — используются только для своего типа товара):
+//   id            text   — уникальный идентификатор товара (например 'valorant-1000')
+//   type          text   — 'rate' | 'premium' | 'list-item'
+//   group_key     text   — для type='rate': ключ группы (например 'stars'/'robux');
+//                          для type='list-item': ключ группы для группировки (например 'keys'/'giftcards')
+//   title         text   — название
+//   sub           text   — подзаголовок/описание
+//   glyph         text   — эмодзи-иконка
+//   category      text   — 'games' | 'services' (верхнеуровневая категория)
+//   subcats       text[] — массив id подкатегорий (см. CATALOG_SUBCATEGORIES выше)
+//   price         numeric — фиксированная цена (только для type='list-item')
+//   unit          text    — единица измерения (только для type='rate', например '⭐')
+//   rate          numeric — цена за 1 единицу в рублях (только для type='rate')
+//   options       numeric[] — доступные объёмы для покупки (только для type='rate')
+//   field_label   text    — подпись поля получателя (только для type='rate')
+//   qty_label     text    — подпись количества (только для type='rate')
+//   hint          text    — подсказка под полем получателя (только для type='rate')
+//   premium_plans jsonb   — массив {label, months, price} (только для type='premium')
+//   sort_order    int     — порядок сортировки
+//   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
+function buildProductConfigs(rows){
+  RATE_CONFIG = {};
+  PREMIUM_PLANS = [];
+  LIST_CONFIG = {};
+  CATALOG_ITEMS = [];
 
-  { title:'Steam Wallet · 500 ₽', sub:'Код активации RU', glyph:'🎮',
-    category:'services', subcats:['gaming'], type:'list-item', listKey:'giftcards', itemId:'steam-500' },
-  { title:'Steam Wallet · 1 000 ₽', sub:'Код активации RU', glyph:'🎮',
-    category:'services', subcats:['gaming'], type:'list-item', listKey:'giftcards', itemId:'steam-1000' },
-  { title:'Google Play · 500 ₽', sub:'Код активации RU', glyph:'▶️',
-    category:'services', subcats:['other'], type:'list-item', listKey:'giftcards', itemId:'gplay-500' },
-  { title:'App Store / iTunes · 1 000 ₽', sub:'Код активации RU', glyph:'🍎',
-    category:'services', subcats:['other'], type:'list-item', listKey:'giftcards', itemId:'appstore-1000' },
-];
+  rows.forEach(row => {
+    if(row.active === false) return;
+
+    if(row.type === 'rate'){
+      RATE_CONFIG[row.id] = {
+        title: row.title,
+        rate: Number(row.rate) || 0,
+        unit: row.unit || '',
+        glyph: row.glyph || '',
+        options: Array.isArray(row.options) ? row.options : [],
+        fieldLabel: row.field_label || 'Юзернейм получателя',
+        hint: row.hint || '',
+        qtyLabel: row.qty_label || 'Количество'
+      };
+      CATALOG_ITEMS.push({
+        title: row.title, sub: row.sub || '', glyph: row.glyph || '',
+        category: row.category, subcats: row.subcats || [],
+        type: 'rate', key: row.id
+      });
+
+    } else if(row.type === 'premium'){
+      PREMIUM_PLANS = Array.isArray(row.premium_plans) ? row.premium_plans : [];
+      CATALOG_ITEMS.push({
+        title: row.title, sub: row.sub || '', glyph: row.glyph || '',
+        category: row.category, subcats: row.subcats || [],
+        type: 'premium'
+      });
+
+    } else if(row.type === 'list-item'){
+      const groupKey = row.group_key || 'other';
+      if(!LIST_CONFIG[groupKey]){
+        LIST_CONFIG[groupKey] = { title: GROUP_TITLES[groupKey] || groupKey, items: [] };
+      }
+      LIST_CONFIG[groupKey].items.push({
+        id: row.id, glyph: row.glyph || '', title: row.title,
+        sub: row.sub || '', price: Number(row.price) || 0
+      });
+      CATALOG_ITEMS.push({
+        title: row.title, sub: row.sub || '', glyph: row.glyph || '',
+        category: row.category, subcats: row.subcats || [],
+        type: 'list-item', listKey: groupKey, itemId: row.id
+      });
+    }
+  });
+}
+
+// Загружает товары из таблицы products в Supabase и перестраивает каталог.
+// Вызывается один раз при старте приложения; при ошибке/отсутствии сети
+// каталог просто останется пустым и покажет empty-state с подсказкой.
+async function loadProducts(){
+  const wrap = document.getElementById('catalogList');
+  if(wrap){
+    wrap.innerHTML = '<div class="empty-state"><div class="glyph">⏳</div><h3>Загружаем каталог…</h3><p>Это займёт пару секунд</p></div>';
+  }
+
+  if(!supabaseClient){
+    buildProductConfigs([]);
+    renderCatalogView();
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .eq('active', true)
+      .order('sort_order', { ascending: true });
+
+    if(error) throw error;
+    buildProductConfigs(data || []);
+  } catch(e){
+    console.error('loadProducts error:', e);
+    showToast('Не удалось загрузить каталог. Проверьте соединение и обновите страницу');
+    buildProductConfigs([]);
+  }
+  renderCatalogView();
+}
 
 // Считаем отображаемую цену услуги независимо от её типа.
 function catalogItemPrice(entry){
   if(entry.type === 'rate'){
     const cfg = RATE_CONFIG[entry.key];
+    if(!cfg || !cfg.options.length) return 0;
     return Math.round(Math.min(...cfg.options) * cfg.rate);
   }
   if(entry.type === 'premium'){
-    return Math.min(...PREMIUM_PLANS.map(p => p.price));
+    return PREMIUM_PLANS.length ? Math.min(...PREMIUM_PLANS.map(p => p.price)) : 0;
   }
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
@@ -1319,7 +1367,7 @@ function attemptBuy(type){
     if(!username){ showToast('Укажите получателя'); return; }
     const total = Math.round(state.rateSelected * cfg.rate);
     purchase = {
-      cat: state.currentCategory, glyph: cfg.unit==='⭐'?'⭐':'🟩',
+      cat: state.currentCategory, glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
       recipient: username, price: total
     };
@@ -1954,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Начальная отрисовка
-  renderCatalogView();
+  loadProducts(); // подтягиваем товары из таблицы products в Supabase и строим каталог
   renderBalance();
   renderReferral();
   loadBalance(); // подтягиваем реальный баланс из Supabase, если открыто в Telegram
