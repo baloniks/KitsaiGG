@@ -774,7 +774,7 @@ const supabaseClient = (window.supabase && SUPABASE_URL.includes('YOUR_PROJECT_R
 // Direct Link). Без него Telegram не сможет передать startapp-параметр —
 // ПОДСТАВЬТЕ РЕАЛЬНОЕ ЗНАЧЕНИЕ, иначе ссылка будет вести на бота без запуска аппа.
 const BOT_USERNAME = 'KitsaiGG_bot';
-const MINIAPP_SHORT_NAME = 'kitsai_app'; // TODO: замените на реальный short_name из BotFather
+const MINIAPP_SHORT_NAME = 'app'; // TODO: замените на реальный short_name из BotFather
 
 /* ---------------- STATE ---------------- */
 let savedGuestId = null;
@@ -1588,15 +1588,15 @@ async function applyPromoCode(){
     }
 
     const credited = Number(data?.credited);
-    const newBalance = Number(data?.balance);
+    const newKcoinBalance = Number(data?.kcoin_balance);
 
-    if(!Number.isNaN(newBalance)){
-      state.balance = newBalance;
+    if(!Number.isNaN(newKcoinBalance)){
+      state.kcoinBalance = newKcoinBalance;
       renderBalance();
     }
 
     input.value = '';
-    showToast(!Number.isNaN(credited) ? `Баланс пополнен на ${rub(credited)}` : 'Промокод применён');
+    showToast(!Number.isNaN(credited) ? `Начислено ${credited.toLocaleString('ru-RU')} KC` : 'Промокод применён');
 
   } catch(e){
     console.error('redeem-promo error:', e);
