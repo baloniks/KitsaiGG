@@ -512,6 +512,10 @@
     <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
       <div class="chip-grid" id="rateChips"></div>
+      <div class="field" id="rateCustomWrap" style="display:none;">
+        <label id="rateCustomLabel">Своё количество</label>
+        <input type="number" id="rateCustomInput" min="1" step="1" inputmode="numeric" placeholder="Введите количество">
+      </div>
       <div class="field">
         <label id="rateFieldLabel">Юзернейм получателя</label>
         <input type="text" id="rateUsername" placeholder="@username">
@@ -1141,13 +1145,43 @@ function renderRateProduct(cat){
     chip.addEventListener('click', () => selectRate(opt, chip));
     grid.appendChild(chip);
   });
+
+  // Чип "своё количество" — открывает поле ручного ввода ниже сетки.
+  const customChip = document.createElement('div');
+  customChip.className = 'chip';
+  customChip.id = 'rateCustomChip';
+  customChip.innerHTML = `<div class="amt">✏️ Своё</div><div class="sub">количество</div>`;
+  customChip.addEventListener('click', () => selectCustomChip(cfg));
+  grid.appendChild(customChip);
+
+  document.getElementById('rateCustomWrap').style.display = 'none';
+  document.getElementById('rateCustomLabel').textContent = 'Своё количество (' + cfg.unit + ')';
+  document.getElementById('rateCustomInput').value = '';
+
   updateRateSummary();
 }
 
 function selectRate(opt, el){
   document.querySelectorAll('#rateChips .chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
+  document.getElementById('rateCustomWrap').style.display = 'none';
   state.rateSelected = opt;
+  updateRateSummary();
+}
+
+function selectCustomChip(cfg){
+  document.querySelectorAll('#rateChips .chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('rateCustomChip').classList.add('selected');
+  document.getElementById('rateCustomWrap').style.display = '';
+  const input = document.getElementById('rateCustomInput');
+  input.focus();
+  applyCustomRateInput(cfg);
+}
+
+function applyCustomRateInput(cfg){
+  const input = document.getElementById('rateCustomInput');
+  const val = parseInt(input.value, 10);
+  state.rateSelected = (Number.isFinite(val) && val > 0) ? val : null;
   updateRateSummary();
 }
 
@@ -1951,6 +1985,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Кнопки покупок на экранах товаров
   document.getElementById('rateBuyBtn').addEventListener('click', () => attemptBuy('rate'));
+  document.getElementById('rateCustomInput').addEventListener('input', () => {
+    applyCustomRateInput(RATE_CONFIG[state.currentCategory]);
+  });
   document.getElementById('premiumBuyBtn').addEventListener('click', () => attemptBuy('premium'));
   document.getElementById('btnItemBuy').addEventListener('click', () => attemptBuy('item'));
   document.getElementById('btnCheckoutCancel').addEventListener('click', goBack);
