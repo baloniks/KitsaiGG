@@ -907,7 +907,8 @@ function buildProductConfigs(rows){
         fieldLabel: row.field_label || 'Юзернейм получателя',
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
-        minQty: row.min_qty != null ? Number(row.min_qty) : null
+        minQty: row.min_qty != null ? Number(row.min_qty) : null,
+        inputMode: row.input_mode === 'input' ? 'input' : 'chips'
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1138,6 +1139,22 @@ function renderRateProduct(cat){
 
   const grid = document.getElementById('rateChips');
   grid.innerHTML = '';
+  const customWrap = document.getElementById('rateCustomWrap');
+  const customInput = document.getElementById('rateCustomInput');
+
+  if(cfg.inputMode === 'input'){
+    // Сразу поле ввода, без сетки готовых сумм и без промежуточного клика.
+    grid.style.display = 'none';
+    customWrap.style.display = '';
+    customInput.value = '';
+    customInput.min = cfg.minQty || 1;
+    document.getElementById('rateCustomLabel').textContent = cfg.qtyLabel
+      + (cfg.minQty ? ' (минимум ' + cfg.minQty.toLocaleString('ru-RU') + ' ' + cfg.unit + ')' : ' (' + cfg.unit + ')');
+    updateRateSummary();
+    return;
+  }
+
+  grid.style.display = '';
   cfg.options.forEach(opt => {
     const price = Math.round(opt * cfg.rate);
     const chip = document.createElement('div');
@@ -1155,10 +1172,9 @@ function renderRateProduct(cat){
   customChip.addEventListener('click', () => selectCustomChip(cfg));
   grid.appendChild(customChip);
 
-  document.getElementById('rateCustomWrap').style.display = 'none';
+  customWrap.style.display = 'none';
   document.getElementById('rateCustomLabel').textContent = 'Своё количество (' + cfg.unit + ')'
     + (cfg.minQty ? ', минимум ' + cfg.minQty.toLocaleString('ru-RU') : '');
-  const customInput = document.getElementById('rateCustomInput');
   customInput.value = '';
   customInput.min = cfg.minQty || 1;
 
