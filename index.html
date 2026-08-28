@@ -337,12 +337,34 @@
   .order-item .right .price{font-family:var(--font-mono); font-weight:600; font-size:13px;}
   .badge{font-size:9.5px; padding:3px 7px; border-radius:999px; background:var(--green-soft); color:var(--green); font-weight:600; letter-spacing:.3px; display:inline-block; margin-top:3px;}
 
-  .filter-row{display:flex; gap:8px; margin-bottom:16px; overflow-x:auto;}
+  .filter-row{display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; scrollbar-width:none;}
+  .filter-row::-webkit-scrollbar{display:none;}
+  .filter-row.sub-row{margin-top:-6px; margin-bottom:18px;}
+  .filter-row.sub-row .filter-pill{font-size:11px; padding:6px 12px; color:var(--text-faint);}
   .filter-pill{
     flex-shrink:0; padding:7px 14px; border-radius:999px; border:1px solid var(--border);
     background:var(--surface); font-size:12px; color:var(--text-muted); cursor:pointer; white-space:nowrap;
   }
   .filter-pill.active{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-2); font-weight:600;}
+
+  /* ---------- Search bar ---------- */
+  .search-bar{
+    display:flex; align-items:center; gap:9px;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius-md); padding:12px 14px; margin:6px 0 16px;
+    box-shadow:var(--shadow-card);
+  }
+  .search-bar .search-icon{font-size:14px; opacity:.55; flex-shrink:0;}
+  .search-bar input{
+    flex:1; min-width:0; background:transparent; border:none; outline:none;
+    color:var(--text); font-family:var(--font-body); font-size:14px;
+  }
+  .search-bar input::placeholder{color:var(--text-faint);}
+  .search-bar .search-clear{
+    flex-shrink:0; width:20px; height:20px; border-radius:50%; border:none;
+    background:var(--surface-3); color:var(--text-muted); font-size:10.5px; cursor:pointer;
+    display:none; align-items:center; justify-content:center;
+  }
 
   .empty-state{text-align:center; padding:60px 20px 20px;}
   .empty-state .glyph{font-size:34px; margin-bottom:12px; opacity:.6;}
@@ -463,55 +485,24 @@
 
     <!-- ===================== CATALOG ===================== -->
     <section class="view active" data-view="catalog">
-      <div class="hero">
-        <div class="eyebrow">⚡ выдача за 1–3 минуты</div>
-        <h1>Игровые ценности и Telegram — в одном магазине</h1>
-        <p>Выберите товар, укажите получателя — оплата с баланса, без лишних форм.</p>
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="catalogSearch" placeholder="Найти игру или сервис" autocomplete="off">
+        <button type="button" class="search-clear" id="catalogSearchClear" aria-label="Очистить">✕</button>
       </div>
 
-      <div class="section-label">Ячейки автомата</div>
-      <div class="cat-grid">
-        <div class="cat-card" data-cat="stars">
-          <div class="cat-icon" style="background:var(--grad-gold); color:#2A1600;">⭐</div>
-          <div>
-            <h3>Telegram Stars</h3>
-            <p>от 50 звёзд</p>
-          </div>
-        </div>
-        <div class="cat-card" data-cat="premium">
-          <div class="cat-icon" style="background:var(--grad-brand); color:#fff;">💎</div>
-          <div>
-            <h3>Telegram Premium</h3>
-            <p>1–12 месяцев</p>
-          </div>
-        </div>
-        <div class="cat-card" data-cat="robux">
-          <div class="cat-icon" style="background:var(--grad-green); color:#04241C;">🟩</div>
-          <div>
-            <h3>Robux</h3>
-            <p>без верификации</p>
-          </div>
-        </div>
-        <div class="cat-card" data-cat="giftcards">
-          <div class="cat-icon" style="background:var(--grad-gold); color:#2A1600;">🎁</div>
-          <div>
-            <h3>Подарочные карты</h3>
-            <p>Steam, Google Play</p>
-          </div>
-        </div>
-        <div class="cat-card wide" data-cat="keys">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="cat-icon" style="background:linear-gradient(135deg,#3A3F52,#252A3A); color:var(--text);">🎮</div>
-            <div>
-              <h3>Игровые ключи и валюта</h3>
-              <p>Valorant Points, GTA$, FIFA Points и другое</p>
-            </div>
-          </div>
-          <div class="cat-arrow">›</div>
-        </div>
+      <div class="filter-row" id="categoryRow"></div>
+      <div class="filter-row" id="subcategoryRow" style="display:none;"></div>
+
+      <div class="section-label" id="catalogSectionLabel" style="margin-top:0;">Все услуги</div>
+      <div id="catalogList"></div>
+
+      <div class="empty-state" id="catalogEmpty" style="display:none;">
+        <div class="glyph">🔎</div>
+        <h3>Ничего не найдено</h3>
+        <p>Попробуйте изменить запрос или выбрать другую категорию</p>
       </div>
 
-      <div class="section-label">Как это работает</div>
       <div class="note-box">
         01 — выбираете товар и получателя · 02 — оплачиваете с баланса · 03 — получаете код или зачисление в течение пары минут
       </div>
@@ -801,6 +792,9 @@ const state = {
   referral: { count: 0, earned: 0, code: '' },
   referrerId: null,
   currentCategory: null,
+  catalogQuery: '',
+  catalogCategory: 'all',
+  catalogSubcategory: null,
   rateSelected: null,
   premiumSelected: null,
   currentListItem: null,
@@ -859,6 +853,92 @@ const LIST_CONFIG = {
 };
 
 const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
+
+/* ---------------- CATALOG: категории, подкатегории, поиск ---------------- */
+// Верхнеуровневые категории каталога. "Все" всегда первая и снимает выбор.
+const CATALOG_CATEGORIES = [
+  { id:'all',      label:'Все',      icon:'✨' },
+  { id:'games',    label:'Игры',     icon:'🎮' },
+  { id:'services', label:'Сервисы',  icon:'⚙️' },
+];
+
+// Подкатегории показываются только для категорий, у которых они заданы здесь.
+// Чтобы добавить новую подкатегорию — впишите её сюда и проставьте её id
+// в поле subcats у нужных товаров в CATALOG_ITEMS ниже.
+const CATALOG_SUBCATEGORIES = {
+  games: [
+    { id:'mobile',  label:'Мобильные' },
+    { id:'pc',      label:'PC' },
+    { id:'console', label:'Консоль' },
+    { id:'shooter', label:'Шутеры' },
+    { id:'casual',  label:'Казуал' },
+    { id:'moba',    label:'Мобы' },
+    { id:'other',   label:'Прочее' },
+  ],
+  services: [
+    { id:'gaming',  label:'Игровые' },
+    { id:'social',  label:'Социальные' },
+    { id:'telegram',label:'Telegram' },
+    { id:'other',   label:'Прочее' },
+  ]
+};
+
+// Единый список услуг для поиска и витрины каталога.
+// type:'rate'      → открывает выбор количества (Stars/Robux); key указывает на RATE_CONFIG
+// type:'premium'   → открывает выбор срока Telegram Premium
+// type:'list-item' → открывает карточку конкретного товара; listKey/itemId указывают на LIST_CONFIG
+// Чтобы добавить новую услугу — просто добавьте объект в этот массив
+// (и, если нужно, сам товар в RATE_CONFIG / LIST_CONFIG выше).
+const CATALOG_ITEMS = [
+  { title:'Telegram Stars', sub:'от 50 звёзд', glyph:'⭐',
+    category:'services', subcats:['telegram'], type:'rate', key:'stars' },
+  { title:'Telegram Premium', sub:'1–12 месяцев', glyph:'💎',
+    category:'services', subcats:['telegram'], type:'premium' },
+
+  { title:'Robux', sub:'без верификации', glyph:'🟩',
+    category:'games', subcats:['mobile','pc','console','casual'], type:'rate', key:'robux' },
+  { title:'Valorant Points · 1 000', sub:'Riot ID, без пароля', glyph:'🔫',
+    category:'games', subcats:['pc','shooter'], type:'list-item', listKey:'keys', itemId:'valorant-1000' },
+  { title:'Valorant Points · 2 050', sub:'Riot ID, без пароля', glyph:'🔫',
+    category:'games', subcats:['pc','shooter'], type:'list-item', listKey:'keys', itemId:'valorant-2050' },
+  { title:'FIFA Points · 4 600', sub:'EA account', glyph:'⚽',
+    category:'games', subcats:['pc','console','other'], type:'list-item', listKey:'keys', itemId:'fifa-4600' },
+  { title:'GTA$ Online · 8 000 000', sub:'Steam / Rockstar', glyph:'🚗',
+    category:'games', subcats:['pc','console','other'], type:'list-item', listKey:'keys', itemId:'gta-online' },
+  { title:'Apex Coins · 2 150', sub:'EA account', glyph:'🎯',
+    category:'games', subcats:['pc','console','shooter'], type:'list-item', listKey:'keys', itemId:'apex-2150' },
+  { title:'Minecraft Java + Bedrock', sub:'Ключ активации', glyph:'⛏️',
+    category:'games', subcats:['pc','console','mobile','casual'], type:'list-item', listKey:'keys', itemId:'minecraft' },
+
+  { title:'Steam Wallet · 500 ₽', sub:'Код активации RU', glyph:'🎮',
+    category:'services', subcats:['gaming'], type:'list-item', listKey:'giftcards', itemId:'steam-500' },
+  { title:'Steam Wallet · 1 000 ₽', sub:'Код активации RU', glyph:'🎮',
+    category:'services', subcats:['gaming'], type:'list-item', listKey:'giftcards', itemId:'steam-1000' },
+  { title:'Google Play · 500 ₽', sub:'Код активации RU', glyph:'▶️',
+    category:'services', subcats:['other'], type:'list-item', listKey:'giftcards', itemId:'gplay-500' },
+  { title:'App Store / iTunes · 1 000 ₽', sub:'Код активации RU', glyph:'🍎',
+    category:'services', subcats:['other'], type:'list-item', listKey:'giftcards', itemId:'appstore-1000' },
+];
+
+// Считаем отображаемую цену услуги независимо от её типа.
+function catalogItemPrice(entry){
+  if(entry.type === 'rate'){
+    const cfg = RATE_CONFIG[entry.key];
+    return Math.round(Math.min(...cfg.options) * cfg.rate);
+  }
+  if(entry.type === 'premium'){
+    return Math.min(...PREMIUM_PLANS.map(p => p.price));
+  }
+  if(entry.type === 'list-item'){
+    const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
+    return item ? item.price : 0;
+  }
+  return 0;
+}
+function catalogItemPriceLabel(entry){
+  const price = catalogItemPrice(entry);
+  return (entry.type === 'rate' || entry.type === 'premium') ? 'от ' + rub(price) : rub(price);
+}
 
 /* ---------------- HELPERS ---------------- */
 const rub = n => n.toLocaleString('ru-RU') + ' ₽';
@@ -1075,6 +1155,116 @@ function updatePremiumSummary(){
   document.getElementById('premiumTotalVal').textContent = rub(plan.price);
   btn.textContent = 'Купить за ' + rub(plan.price);
   btn.classList.remove('disabled');
+}
+
+/* ---------------- CATALOG VIEW: поиск, категории, подкатегории ---------------- */
+function renderCatalogView(){
+  renderCatalogFilters();
+  renderCatalogList();
+}
+
+function renderCatalogFilters(){
+  const catRow = document.getElementById('categoryRow');
+  catRow.innerHTML = '';
+  CATALOG_CATEGORIES.forEach(cat => {
+    const pill = document.createElement('div');
+    pill.className = 'filter-pill' + (state.catalogCategory === cat.id ? ' active' : '');
+    pill.textContent = cat.icon + ' ' + cat.label;
+    pill.addEventListener('click', () => selectCatalogCategory(cat.id));
+    catRow.appendChild(pill);
+  });
+
+  const subRow = document.getElementById('subcategoryRow');
+  const subs = CATALOG_SUBCATEGORIES[state.catalogCategory];
+  if(subs && subs.length){
+    subRow.style.display = 'flex';
+    subRow.classList.add('sub-row');
+    subRow.innerHTML = '';
+    const allPill = document.createElement('div');
+    allPill.className = 'filter-pill' + (state.catalogSubcategory === null ? ' active' : '');
+    allPill.textContent = 'Все';
+    allPill.addEventListener('click', () => selectCatalogSubcategory(null));
+    subRow.appendChild(allPill);
+    subs.forEach(sc => {
+      const pill = document.createElement('div');
+      pill.className = 'filter-pill' + (state.catalogSubcategory === sc.id ? ' active' : '');
+      pill.textContent = sc.label;
+      pill.addEventListener('click', () => selectCatalogSubcategory(sc.id));
+      subRow.appendChild(pill);
+    });
+  } else {
+    subRow.style.display = 'none';
+    subRow.innerHTML = '';
+  }
+}
+
+function selectCatalogCategory(id){
+  // Повторный тап по уже выбранной категории (кроме "Все") сбрасывает фильтр.
+  state.catalogCategory = (state.catalogCategory === id && id !== 'all') ? 'all' : id;
+  state.catalogSubcategory = null;
+  renderCatalogFilters();
+  renderCatalogList();
+}
+
+function selectCatalogSubcategory(id){
+  state.catalogSubcategory = (state.catalogSubcategory === id) ? null : id;
+  renderCatalogFilters();
+  renderCatalogList();
+}
+
+function filteredCatalogItems(){
+  const q = state.catalogQuery.trim().toLowerCase();
+  return CATALOG_ITEMS.filter(item => {
+    if(state.catalogCategory !== 'all' && item.category !== state.catalogCategory) return false;
+    if(state.catalogSubcategory && !item.subcats.includes(state.catalogSubcategory)) return false;
+    if(q && !(item.title.toLowerCase().includes(q) || item.sub.toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderCatalogList(){
+  const items = filteredCatalogItems();
+  const wrap = document.getElementById('catalogList');
+  const empty = document.getElementById('catalogEmpty');
+  const label = document.getElementById('catalogSectionLabel');
+
+  const catInfo = CATALOG_CATEGORIES.find(c => c.id === state.catalogCategory);
+  if(state.catalogQuery.trim()){
+    label.textContent = `Результаты · ${items.length}`;
+  } else {
+    label.textContent = (catInfo && catInfo.id !== 'all') ? catInfo.label : 'Все услуги';
+  }
+
+  wrap.innerHTML = '';
+  if(!items.length){
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  items.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'prod-row';
+    row.innerHTML = `
+      <div class="glyph">${entry.glyph}</div>
+      <div class="info"><h4>${entry.title}</h4><span>${entry.sub}</span></div>
+      <div class="price">${catalogItemPriceLabel(entry)}</div>
+      <button class="buy-mini">Купить</button>`;
+    row.addEventListener('click', () => openCatalogItem(entry));
+    wrap.appendChild(row);
+  });
+}
+
+// Роутинг клика по услуге в каталоге на соответствующий существующий экран покупки.
+function openCatalogItem(entry){
+  if(entry.type === 'rate'){
+    openCategory(entry.key);
+  } else if(entry.type === 'premium'){
+    openCategory('premium');
+  } else if(entry.type === 'list-item'){
+    const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
+    if(item) openItemDetail(item);
+  }
 }
 
 function renderListProduct(cat){
@@ -1686,12 +1876,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Кнопка баланса в шапке
   document.getElementById('btnHeaderBalance').addEventListener('click', openTopup);
 
-  // Карточки категорий на главной
-  document.querySelectorAll('.cat-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const cat = card.getAttribute('data-cat');
-      if(cat) openCategory(cat);
-    });
+  // Поиск по каталогу услуг
+  const catalogSearchInput = document.getElementById('catalogSearch');
+  const catalogSearchClear = document.getElementById('catalogSearchClear');
+  catalogSearchInput.addEventListener('input', () => {
+    state.catalogQuery = catalogSearchInput.value;
+    catalogSearchClear.style.display = state.catalogQuery ? 'flex' : 'none';
+    renderCatalogList();
+  });
+  catalogSearchClear.addEventListener('click', () => {
+    catalogSearchInput.value = '';
+    state.catalogQuery = '';
+    catalogSearchClear.style.display = 'none';
+    renderCatalogList();
+    catalogSearchInput.focus();
   });
 
   // Фильтры заказов
@@ -1755,6 +1953,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Начальная отрисовка
+  renderCatalogView();
   renderBalance();
   renderReferral();
   loadBalance(); // подтягиваем реальный баланс из Supabase, если открыто в Telegram
