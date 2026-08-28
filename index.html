@@ -768,6 +768,14 @@ const supabaseClient = (window.supabase && SUPABASE_URL.includes('YOUR_PROJECT_R
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+// Реферальные ссылки. BOT_USERNAME — юзернейм бота без @.
+// MINIAPP_SHORT_NAME — короткое имя мини-аппа, которое вы задали в BotFather
+// при подключении Web App (/newapp или /myapps → Bot Settings → Menu Button /
+// Direct Link). Без него Telegram не сможет передать startapp-параметр —
+// ПОДСТАВЬТЕ РЕАЛЬНОЕ ЗНАЧЕНИЕ, иначе ссылка будет вести на бота без запуска аппа.
+const BOT_USERNAME = 'KitsaiGG_bot';
+const MINIAPP_SHORT_NAME = 'app'; // TODO: замените на реальный short_name из BotFather
+
 /* ---------------- STATE ---------------- */
 let savedGuestId = null;
 try {
@@ -785,6 +793,7 @@ try {
 
 const state = {
   userId: savedGuestId,
+  telegramId: null, // реальный telegram_id из initDataUnsafe.user, если открыто в Telegram
   balance: 0,
   kcoinBalance: 0,
   pendingKcoinToUse: null, // сколько KCoin списываем в текущем оформлении заказа
@@ -868,9 +877,41 @@ function renderBalance(){
 
 function renderReferral(){
   document.getElementById('refCount').textContent = state.referral.count;
-  document.getElementById('refEarned').textContent = rub(state.referral.earned);
-  // TODO: замените KitsaiGGBot на username вашего бота
-  document.getElementById('refLinkText').textContent = 'https://t.me/KitsaiGGBot?start=ref_' + state.userId;
+  // Бонус реферера начисляется в KCoin, а не в рублях — не показываем как ₽
+  document.getElementById('refEarned').textContent = state.referral.earned.toLocaleString('ru-RU') + ' KC';
+
+  const linkEl = document.getElementById('refLinkText');
+  if (state.telegramId) {
+    // Формат прямой ссылки на мини-апп: Telegram сам положит telegram_id
+    // реферера в start_param внутри подписанного initData нового пользователя.
+    linkEl.textContent = `https://t.me/${BOT_USERNAME}/${MINIAPP_SHORT_NAME}?startapp=${state.telegramId}`;
+  } else {
+    linkEl.textContent = 'Откройте через Telegram, чтобы получить свою ссылку';
+  }
+}
+
+/* Подтягиваем статистику по рефералам с сервера */
+async function loadReferralStats(){
+  if(!supabaseClient) return;
+  const initData = getTelegramInitData();
+  if(!initData) return;
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('get-referral-stats', {
+      body: { init_data: initData }
+    });
+
+    if(error){
+      console.error('get-referral-stats error:', error);
+      return;
+    }
+
+    state.referral.count = Number(data?.referral_count) || 0;
+    state.referral.earned = Number(data?.kcoin_earned) || 0;
+    renderReferral();
+  } catch(e){
+    console.error('get-referral-stats error:', e);
+  }
 }
 
 function openExternalLink(url) {
@@ -1602,6 +1643,8 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Telegram user:', tgUser);
 
       if (tgUser) {
+        state.telegramId = tgUser.id;
+
         const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
         document.getElementById('userName').textContent = fullName || 'Пользователь';
 
@@ -1715,6 +1758,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBalance();
   renderReferral();
   loadBalance(); // подтягиваем реальный баланс из Supabase, если открыто в Telegram
+  loadReferralStats(); // подтягиваем статистику по рефералам (после того как loadBalance вызвал upsert_profile_with_referral и зафиксировал referred_by)
 });
 </script>
 </body>
