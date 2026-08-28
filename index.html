@@ -610,6 +610,8 @@
       <div class="balance-card">
         <div class="lbl">Доступный баланс</div>
         <div class="val" id="balanceProfile">0 ₽</div>
+        <div class="lbl" style="margin-top:8px;">Кэшбек KCoin</div>
+        <div class="val" id="kcoinVal" style="font-size:16px;">0 KC</div>
         <button class="btn-primary" style="margin-top:0;" id="btnProfileTopup">Пополнить баланс</button>
       </div>
 
@@ -752,6 +754,7 @@ try {
 const state = {
   userId: savedGuestId,
   balance: 0,
+  kcoinBalance: 0,
   orders: [],
   referral: { count: 0, earned: 0, code: '' },
   referrerId: null,
@@ -826,6 +829,8 @@ function genId(){ return 'KG-' + Math.floor(70000+Math.random()*29999); }
 function renderBalance(){
   document.getElementById('balanceTop').textContent = rub(state.balance);
   document.getElementById('balanceProfile').textContent = rub(state.balance);
+  const kcoinEl = document.getElementById('kcoinVal');
+  if(kcoinEl) kcoinEl.textContent = state.kcoinBalance.toLocaleString('ru-RU') + ' KC';
 }
 
 function renderReferral(){
@@ -1108,24 +1113,72 @@ function renderCheckoutReceipt(p){
   }
 }
 
-function confirmPurchase(){
+async function confirmPurchase(){
   const p = state.pendingPurchase;
-  if(state.balance < p.price){
-    showToast('Недостаточно средств');
+  if(!p) return;
+
+  const btn = document.getElementById('checkoutConfirmBtn');
+  const prevText = btn.textContent;
+  btn.textContent = 'Обрабатываем...';
+  btn.classList.add('disabled');
+
+  const initData = getTelegramInitData();
+  if(!initData){
+    showToast('Откройте приложение через Telegram-бота');
+    btn.textContent = prevText;
+    btn.classList.remove('disabled');
     return;
   }
-  
-  state.balance -= p.price;
-  const id = genId();
-  state.orders.unshift({
-    id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
-  });
 
-  renderBalance();
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('create-order', {
+      body: {
+        init_data: initData,
+        category: p.cat,
+        title: p.title,
+        recipient: p.recipient,
+        price_rub: p.price
+      }
+    });
 
-  document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
-  state.navStack = ['catalog','success'];
-  showView('success', {sub:true, title:'Готово'});
+    if(error || data?.error){
+      const code = data?.error;
+      const messages = {
+        insufficient_funds: 'Недостаточно средств',
+        unauthorized: 'Не удалось подтвердить пользователя Telegram',
+        invalid_params: 'Некорректные данные заказа',
+        profile_not_found: 'Профиль не найден'
+      };
+      showToast(messages[code] || 'Не удалось оформить заказ. Попробуйте ещё раз');
+      return;
+    }
+
+    // Баланс и KCoin теперь берём из ответа сервера, а не считаем сами —
+    // это единственный источник правды.
+    state.balance = Number(data.balance);
+    state.kcoinBalance = Number(data.kcoin_balance);
+    renderBalance();
+
+    const id = data.order_id;
+    state.orders.unshift({
+      id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
+    });
+
+    document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
+    state.navStack = ['catalog','success'];
+    showView('success', {sub:true, title:'Готово'});
+
+    if(data.cashback > 0){
+      showToast(`Начислен кэшбек: +${data.cashback} KC`);
+    }
+
+  } catch(e){
+    console.error('create-order error:', e);
+    showToast('Не удалось оформить заказ. Попробуйте ещё раз');
+  } finally {
+    btn.textContent = prevText;
+    btn.classList.remove('disabled');
+  }
 }
 
 /* ---------------- ORDERS VIEW ---------------- */
@@ -1275,6 +1328,7 @@ async function loadBalance(){
     }
 
     state.balance = parsedBalance;
+    state.kcoinBalance = Number(data?.kcoin_balance) || 0;
     renderBalance();
   } catch(e){
     console.error('get-profile error:', e);
