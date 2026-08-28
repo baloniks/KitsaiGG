@@ -2,9 +2,6 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <title>KitsaiGG — цифровой магазин</title>
 
@@ -1007,6 +1004,19 @@ function catalogItemPriceLabel(entry){
 
 /* ---------------- HELPERS ---------------- */
 const rub = n => n.toLocaleString('ru-RU') + ' ₽';
+
+// Проверка юзернейма по правилам Telegram: начинается с @, дальше только
+// латиница/цифры/подчёркивание, первый символ после @ — буква, длина 5-32.
+function checkTelegramUsername(raw){
+  if(!raw.startsWith('@')){
+    return { ok:false, msg:'Юзернейм должен начинаться с @, например @username' };
+  }
+  const body = raw.slice(1);
+  if(!/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(body)){
+    return { ok:false, msg:'Юзернейм — латиницей, 5–32 символа (буквы/цифры/_), первый символ буква' };
+  }
+  return { ok:true };
+}
 function fmtDate(){
   const d = new Date();
   return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'short'}) + ', ' + d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
@@ -1430,6 +1440,10 @@ function attemptBuy(type){
     const cfg = RATE_CONFIG[state.currentCategory];
     const username = document.getElementById('rateUsername').value.trim();
     if(!username){ showToast('Укажите получателя'); return; }
+    if(state.currentCategory === 'stars'){
+      const check = checkTelegramUsername(username);
+      if(!check.ok){ showToast(check.msg); return; }
+    }
     const total = Math.round(state.rateSelected * cfg.rate);
     purchase = {
       cat: state.currentCategory, glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
