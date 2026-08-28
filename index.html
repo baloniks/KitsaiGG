@@ -1133,7 +1133,7 @@ function receiptHTML(p, id, stamped){
     <div class="receipt-row"><span>Спишется с баланса</span><span class="fill"></span><span class="value">− ${rub(rubDue)}</span></div>
     <div class="receipt-row"><span>Останется</span><span class="fill"></span><span class="value" style="color:${balanceAfter<0?'var(--danger)':'var(--green)'}">${rub(Math.max(balanceAfter,0))}${balanceAfter<0?' · не хватает':''}</span></div>
     ` : ''}
-    <div class="rtotal"><span class="lbl">Итого к оплате</span><span class="val">${rub(p.price)}</span></div>
+    <div class="rtotal"><span class="lbl">Итого к оплате</span><span class="val">${rub(rubDue)}</span></div>
     ${stamped ? '<div class="stamp">✓ ОПЛАЧЕНО · СПИСАНО ТОЧНО</div>' : ''}
     <div class="barcode">${Array.from({length:28}).map(()=>`<div style="height:${8+Math.random()*14}px;"></div>`).join('')}</div>
   `;
@@ -1167,9 +1167,9 @@ function renderKcoinBox(p){
   box.style.display = 'block';
   avail.textContent = Math.floor(state.kcoinBalance).toLocaleString('ru-RU');
 
-  // По умолчанию предлагаем списать максимум доступного KCoin — это и есть "предложить списать".
+  // По умолчанию KCoin не списываем — галочка выключена, пока пользователь сам её не включит.
   if(state.pendingKcoinToUse == null){
-    state.pendingKcoinToUse = max;
+    state.pendingKcoinToUse = 0;
   }
   state.pendingKcoinToUse = Math.max(0, Math.min(state.pendingKcoinToUse, max));
 
