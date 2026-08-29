@@ -817,6 +817,7 @@ const state = {
 let RATE_CONFIG = {};
 let PREMIUM_PLANS = [];
 let PREMIUM_FIELD_LABEL = '';
+let PREMIUM_FIELD_PLACEHOLDER = '';
 let PREMIUM_NEEDS_FIELD = false;
 let LIST_CONFIG = {};
 
@@ -894,6 +895,7 @@ function buildProductConfigs(rows){
   RATE_CONFIG = {};
   PREMIUM_PLANS = [];
   PREMIUM_FIELD_LABEL = '';
+  PREMIUM_FIELD_PLACEHOLDER = '';
   PREMIUM_NEEDS_FIELD = false;
   LIST_CONFIG = {};
   CATALOG_ITEMS = [];
@@ -912,6 +914,7 @@ function buildProductConfigs(rows){
         // заполнен field_label. Оставьте его пустым/NULL у товара, если
         // получатель не нужен (например, зачисление идёт по покупателю).
         fieldLabel: row.field_label || '',
+        fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
@@ -927,6 +930,7 @@ function buildProductConfigs(rows){
     } else if(row.type === 'premium'){
       PREMIUM_PLANS = Array.isArray(row.premium_plans) ? row.premium_plans : [];
       PREMIUM_FIELD_LABEL = row.field_label || '';
+      PREMIUM_FIELD_PLACEHOLDER = row.field_placeholder || '';
       PREMIUM_NEEDS_FIELD = !!(row.field_label && String(row.field_label).trim());
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -943,6 +947,7 @@ function buildProductConfigs(rows){
         id: row.id, glyph: row.glyph || '', title: row.title,
         sub: row.sub || '', price: Number(row.price) || 0,
         fieldLabel: row.field_label || '',
+        fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim())
       });
       CATALOG_ITEMS.push({
@@ -1165,6 +1170,7 @@ function renderRateProduct(cat){
   state.rateSelected = null;
   document.getElementById('rateFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
+  document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('rateHint').textContent = cfg.hint;
   document.getElementById('rateUsername').value = '';
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
@@ -1260,6 +1266,7 @@ function renderPremiumProduct(){
   state.premiumSelected = null;
   document.getElementById('premiumFieldWrap').style.display = PREMIUM_NEEDS_FIELD ? '' : 'none';
   document.getElementById('premiumFieldLabel').textContent = PREMIUM_FIELD_LABEL;
+  document.getElementById('premiumUsername').placeholder = PREMIUM_FIELD_PLACEHOLDER || '@username';
   document.getElementById('premiumUsername').value = '';
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
@@ -1432,6 +1439,7 @@ function openItemDetail(item){
   document.getElementById('itemSubtitle').textContent = item.sub;
   document.getElementById('itemFieldWrap').style.display = item.needsField ? '' : 'none';
   document.getElementById('itemFieldLabel').textContent = item.fieldLabel;
+  document.getElementById('itemUsername').placeholder = item.fieldPlaceholder || '@username или ник в игре';
   document.getElementById('itemUsername').value = '';
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
