@@ -1202,15 +1202,52 @@ const TOPUP_AMOUNTS = [100,250,500,1000,2500,5000];
 // Ссылка на группу отзывов
 const REVIEW_GROUP_URL = 'https://t.me/KitsaiReviews';
 
+// Локальный кэш отклонённых баннеров (localStorage). Это подстраховка на
+// случай, если Edge Function dismiss-review недоступна, ещё не задеплоена,
+// упала по сети или initData пуст (например, открыто вне Telegram) —
+// без этого кэша сервер на следующей загрузке снова присылал бы
+// review_dismissed:false, и баннер выскакивал повторно при каждом
+// перезаходе в мини-апп.
+const REVIEW_DISMISSED_KEY = 'kitsaigg_dismissed_reviews';
+
+function getLocalDismissedReviews(){
+  try {
+    const raw = localStorage.getItem(REVIEW_DISMISSED_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.map(String) : [];
+  } catch(e){
+    return [];
+  }
+}
+
+function addLocalDismissedReview(orderId){
+  try {
+    const ids = getLocalDismissedReviews();
+    const idStr = String(orderId);
+    if(!ids.includes(idStr)){
+      ids.push(idStr);
+      localStorage.setItem(REVIEW_DISMISSED_KEY, JSON.stringify(ids));
+    }
+  } catch(e){
+    // localStorage недоступен (заблокирован встроенным браузером Telegram) —
+    // тогда полагаемся только на серверный флаг review_dismissed
+  }
+}
+
 // Показываем баннер над поиском в каталоге, если самый свежий заказ
-// пользователя выполнен успешно (status === 'completed') и он ещё не
-// отмечен как "review_dismissed" в таблице purchases (колонка добавляется
-// миграцией — см. инструкцию рядом с этим блоком в переписке).
+// пользователя выполнен успешно (status === 'completed'), он ещё не
+// отмечен как "review_dismissed" в таблице purchases и не отклонён
+// локально (см. REVIEW_DISMISSED_KEY выше).
 function renderReviewBanner(){
   const banner = document.getElementById('reviewBanner');
   if(!banner) return;
 
-  const order = (state.orders || []).find(o => o.status === 'completed' && !o.reviewDismissed);
+  const dismissedLocally = getLocalDismissedReviews();
+  const order = (state.orders || []).find(o =>
+    o.status === 'completed' &&
+    !o.reviewDismissed &&
+    !dismissedLocally.includes(String(o.id))
+  );
   if(!order){
     banner.style.display = 'none';
     banner.dataset.orderId = '';
@@ -1225,10 +1262,12 @@ function renderReviewBanner(){
 }
 
 // Закрытие баннера (крестик или клик "Оставить отзыв").
-// Прячем баннер сразу (оптимистично), а флаг review_dismissed=true
-// пишем через Edge Function dismiss-review — она проверяет init_data
-// и обновляет только заказ, реально принадлежащий этому telegram_id
-// (прямая запись в таблицу с anon-ключом отключена).
+// Прячем баннер сразу (оптимистично) и СРАЗУ ЖЕ пишем orderId в
+// localStorage — это гарантирует, что баннер не появится повторно при
+// перезаходе в мини-апп, даже если серверный вызов ниже не выполнится.
+// Флаг review_dismissed=true в БД пишем через Edge Function dismiss-review —
+// она проверяет init_data и обновляет только заказ, реально принадлежащий
+// этому telegram_id (прямая запись в таблицу с anon-ключом отключена).
 async function dismissReviewBanner(){
   const banner = document.getElementById('reviewBanner');
   if(!banner) return;
@@ -1236,9 +1275,11 @@ async function dismissReviewBanner(){
   banner.style.display = 'none';
   if(!orderId) return;
 
-  // Обновляем локально, чтобы баннер не мигнул повторно до перезагрузки
+  // Обновляем локально (state + localStorage), чтобы баннер не появился
+  // снова ни в этой сессии, ни при следующем открытии мини-аппа
   const order = state.orders.find(o => String(o.id) === String(orderId));
   if(order) order.reviewDismissed = true;
+  addLocalDismissedReview(orderId);
 
   const initData = getTelegramInitData();
   if(!supabaseClient || !initData) return;
