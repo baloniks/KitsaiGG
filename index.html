@@ -852,6 +852,7 @@ let PREMIUM_FIELD_LABEL = '';
 let PREMIUM_FIELD_PLACEHOLDER = '';
 let PREMIUM_NEEDS_FIELD = false;
 let PREMIUM_DESCRIPTION = '';
+let PREMIUM_CONSENT_TEXT = '';
 let LIST_CONFIG = {};
 
 // Человеко-читаемые заголовки для групп list-item товаров (используются как
@@ -931,6 +932,7 @@ function buildProductConfigs(rows){
   PREMIUM_FIELD_PLACEHOLDER = '';
   PREMIUM_NEEDS_FIELD = false;
   PREMIUM_DESCRIPTION = '';
+  PREMIUM_CONSENT_TEXT = '';
   LIST_CONFIG = {};
   CATALOG_ITEMS = [];
 
@@ -951,6 +953,7 @@ function buildProductConfigs(rows){
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
+        consentText: row.consent_text || '',
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
         minQty: row.min_qty != null ? Number(row.min_qty) : null,
@@ -969,6 +972,7 @@ function buildProductConfigs(rows){
       PREMIUM_FIELD_PLACEHOLDER = row.field_placeholder || '';
       PREMIUM_NEEDS_FIELD = !!(row.field_label && String(row.field_label).trim());
       PREMIUM_DESCRIPTION = row.description || '';
+      PREMIUM_CONSENT_TEXT = row.consent_text || '';
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
@@ -987,6 +991,7 @@ function buildProductConfigs(rows){
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
+        consentText: row.consent_text || '',
         maxQty: row.max_qty != null ? Number(row.max_qty) : null
       });
       CATALOG_ITEMS.push({
@@ -1213,8 +1218,14 @@ function consentText(title, hasDescription){
 
 // Настраивает чекбокс согласия под конкретный товар: подставляет текст,
 // сбрасывает отметку при каждом открытии и вешает пересчёт кнопки при клике.
-function setupConsent(prefix, title, hasDescription, onChange){
-  document.getElementById(prefix + 'ConsentText').textContent = consentText(title, hasDescription);
+// customText — значение поля consent_text из таблицы products; если задано,
+// используется как есть (плейсхолдер {title} подставляется автоматически),
+// иначе текст собирается по стандартному шаблону.
+function setupConsent(prefix, title, hasDescription, onChange, customText){
+  const text = customText && customText.trim()
+    ? customText.replace(/\{title\}/g, title)
+    : consentText(title, hasDescription);
+  document.getElementById(prefix + 'ConsentText').textContent = text;
   const checkbox = document.getElementById(prefix + 'Consent');
   checkbox.checked = false;
   checkbox.onchange = onChange;
@@ -1230,7 +1241,7 @@ function renderRateProduct(cat){
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.textContent = cfg.description;
   rateDesc.style.display = cfg.description ? '' : 'none';
-  setupConsent('rate', cfg.title, !!cfg.description, updateRateSummary);
+  setupConsent('rate', cfg.title, !!cfg.description, updateRateSummary, cfg.consentText);
   document.getElementById('rateUsername').value = '';
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
   document.getElementById('rateRateVal').textContent = '1 ' + cfg.unit + ' ≈ ' + cfg.rate.toFixed(2) + ' ₽';
@@ -1341,7 +1352,7 @@ function renderPremiumProduct(){
   const premiumDesc = document.getElementById('premiumDescription');
   premiumDesc.textContent = PREMIUM_DESCRIPTION;
   premiumDesc.style.display = PREMIUM_DESCRIPTION ? '' : 'none';
-  setupConsent('premium', 'Telegram Premium', !!PREMIUM_DESCRIPTION, updatePremiumSummary);
+  setupConsent('premium', 'Telegram Premium', !!PREMIUM_DESCRIPTION, updatePremiumSummary, PREMIUM_CONSENT_TEXT);
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
   PREMIUM_PLANS.forEach((p, i) => {
@@ -1522,7 +1533,7 @@ function openItemDetail(item){
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.textContent = item.description;
   itemDesc.style.display = item.description ? '' : 'none';
-  setupConsent('item', item.title, !!item.description, updateItemSummary);
+  setupConsent('item', item.title, !!item.description, updateItemSummary, item.consentText);
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
 }
