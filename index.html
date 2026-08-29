@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -204,6 +204,12 @@
   .note-box{
     margin-top:16px; background:var(--surface); border:1px dashed var(--border);
     border-radius:var(--radius-sm); padding:11px 12px; font-size:11.5px; color:var(--text-muted); line-height:1.5;
+  }
+
+  .product-description{
+    margin-top:14px; margin-bottom:2px; padding:12px 13px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm);
+    font-size:12.5px; color:var(--text-muted); line-height:1.55; white-space:pre-line;
   }
 
   /* ---------- Product list rows ---------- */
@@ -521,6 +527,7 @@
         <input type="text" id="rateUsername" placeholder="@username">
         <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       </div>
+      <div class="product-description" id="rateDescription" style="display:none;"></div>
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
@@ -537,6 +544,7 @@
         <input type="text" id="premiumUsername" placeholder="@username">
         <div class="hint">Активация без пароля и без кода подтверждения.</div>
       </div>
+      <div class="product-description" id="premiumDescription" style="display:none;"></div>
       <div class="order-bar">
         <div class="row"><span>Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
@@ -570,6 +578,7 @@
           <button id="btnQtyPlus">+</button>
         </div>
       </div>
+      <div class="product-description" id="itemDescription" style="display:none;"></div>
       <div class="order-bar">
         <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— ₽</span></div>
@@ -819,6 +828,7 @@ let PREMIUM_PLANS = [];
 let PREMIUM_FIELD_LABEL = '';
 let PREMIUM_FIELD_PLACEHOLDER = '';
 let PREMIUM_NEEDS_FIELD = false;
+let PREMIUM_DESCRIPTION = '';
 let LIST_CONFIG = {};
 
 // Человеко-читаемые заголовки для групп list-item товаров (используются как
@@ -897,6 +907,7 @@ function buildProductConfigs(rows){
   PREMIUM_FIELD_LABEL = '';
   PREMIUM_FIELD_PLACEHOLDER = '';
   PREMIUM_NEEDS_FIELD = false;
+  PREMIUM_DESCRIPTION = '';
   LIST_CONFIG = {};
   CATALOG_ITEMS = [];
 
@@ -916,6 +927,7 @@ function buildProductConfigs(rows){
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
+        description: row.description || '',
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
         minQty: row.min_qty != null ? Number(row.min_qty) : null,
@@ -932,6 +944,7 @@ function buildProductConfigs(rows){
       PREMIUM_FIELD_LABEL = row.field_label || '';
       PREMIUM_FIELD_PLACEHOLDER = row.field_placeholder || '';
       PREMIUM_NEEDS_FIELD = !!(row.field_label && String(row.field_label).trim());
+      PREMIUM_DESCRIPTION = row.description || '';
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
@@ -948,7 +961,8 @@ function buildProductConfigs(rows){
         sub: row.sub || '', price: Number(row.price) || 0,
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
-        needsField: !!(row.field_label && String(row.field_label).trim())
+        needsField: !!(row.field_label && String(row.field_label).trim()),
+        description: row.description || ''
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1172,6 +1186,9 @@ function renderRateProduct(cat){
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('rateHint').textContent = cfg.hint;
+  const rateDesc = document.getElementById('rateDescription');
+  rateDesc.textContent = cfg.description;
+  rateDesc.style.display = cfg.description ? '' : 'none';
   document.getElementById('rateUsername').value = '';
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
   document.getElementById('rateRateVal').textContent = '1 ' + cfg.unit + ' ≈ ' + cfg.rate.toFixed(2) + ' ₽';
@@ -1268,6 +1285,9 @@ function renderPremiumProduct(){
   document.getElementById('premiumFieldLabel').textContent = PREMIUM_FIELD_LABEL;
   document.getElementById('premiumUsername').placeholder = PREMIUM_FIELD_PLACEHOLDER || '@username';
   document.getElementById('premiumUsername').value = '';
+  const premiumDesc = document.getElementById('premiumDescription');
+  premiumDesc.textContent = PREMIUM_DESCRIPTION;
+  premiumDesc.style.display = PREMIUM_DESCRIPTION ? '' : 'none';
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
   PREMIUM_PLANS.forEach((p, i) => {
@@ -1441,6 +1461,9 @@ function openItemDetail(item){
   document.getElementById('itemFieldLabel').textContent = item.fieldLabel;
   document.getElementById('itemUsername').placeholder = item.fieldPlaceholder || '@username или ник в игре';
   document.getElementById('itemUsername').value = '';
+  const itemDesc = document.getElementById('itemDescription');
+  itemDesc.textContent = item.description;
+  itemDesc.style.display = item.description ? '' : 'none';
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
 }
