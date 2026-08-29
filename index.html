@@ -761,6 +761,11 @@
       <div class="list-link" id="linkSupport"><div class="l"><span class="ic">💬</span>Написать в поддержку</div><div class="r">›</div></div>
       <div class="list-link" id="linkTicket"><div class="l"><span class="ic">🎫</span>Создать тикет</div><div class="r">›</div></div>
       <div class="list-link" id="linkRules"><div class="l"><span class="ic">📄</span>Правила сервиса</div><div class="r">›</div></div>
+
+      <div class="section-label" style="margin-top:6px;">Документы</div>
+      <div class="list-link" id="linkTerms"><div class="l"><span class="ic">📜</span>Пользовательское соглашение</div><div class="r">›</div></div>
+      <div class="list-link" id="linkPrivacy"><div class="l"><span class="ic">🔒</span>Политика конфиденциальности</div><div class="r">›</div></div>
+      <div class="list-link" id="linkRefundPolicy"><div class="l"><span class="ic">↩️</span>Политика возвратов</div><div class="r">›</div></div>
     </section>
 
     <!-- ===================== SUPPORT ===================== -->
@@ -812,6 +817,30 @@
         <p>Начисления 1% действуют с покупок всех зарегистрировавшихся по вашей ссылке пользователей.</p>
       </div>
       <button class="btn-secondary" id="btnRulesBack">Назад</button>
+    </section>
+
+    <!-- ===================== TERMS ===================== -->
+    <section class="view" data-view="terms">
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.75;">
+        <p>Текст пользовательского соглашения будет добавлен здесь.</p>
+      </div>
+      <button class="btn-secondary" id="btnTermsBack">Назад</button>
+    </section>
+
+    <!-- ===================== PRIVACY ===================== -->
+    <section class="view" data-view="privacy">
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.75;">
+        <p>Текст политики конфиденциальности будет добавлен здесь.</p>
+      </div>
+      <button class="btn-secondary" id="btnPrivacyBack">Назад</button>
+    </section>
+
+    <!-- ===================== REFUND POLICY ===================== -->
+    <section class="view" data-view="refund-policy">
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.75;">
+        <p>Текст политики возвратов будет добавлен здесь.</p>
+      </div>
+      <button class="btn-secondary" id="btnRefundPolicyBack">Назад</button>
     </section>
 
     <!-- ===================== TOP-UP ===================== -->
@@ -2496,9 +2525,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('linkTicket').addEventListener('click', () => pushView('ticket', {sub:true, title:'Новый тикет'}));
   document.getElementById('linkRules').addEventListener('click', () => pushView('rules', {sub:true, title:'Правила сервиса'}));
+  document.getElementById('linkTerms').addEventListener('click', () => pushView('terms', {sub:true, title:'Пользовательское соглашение'}));
+  document.getElementById('linkPrivacy').addEventListener('click', () => pushView('privacy', {sub:true, title:'Политика конфиденциальности'}));
+  document.getElementById('linkRefundPolicy').addEventListener('click', () => pushView('refund-policy', {sub:true, title:'Политика возвратов'}));
 
   document.getElementById('btnSupportBack').addEventListener('click', goBack);
   document.getElementById('btnRulesBack').addEventListener('click', goBack);
+  document.getElementById('btnTermsBack').addEventListener('click', goBack);
+  document.getElementById('btnPrivacyBack').addEventListener('click', goBack);
+  document.getElementById('btnRefundPolicyBack').addEventListener('click', goBack);
 
   // Открыть чат поддержки в Telegram
   document.getElementById('btnTgSupport').addEventListener('click', () => {
