@@ -329,7 +329,8 @@
     background:var(--green-soft);
   }
   .receipt .stamp.cancelled{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
-  .receipt .stamp.refunded{ color:var(--gold); border-color:var(--gold); background:var(--gold-soft); }
+  .receipt .stamp.refunded{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+  .receipt .stamp.processing{ color:var(--accent-2); border-color:var(--accent); background:var(--accent-soft); }
   .barcode{display:flex; gap:2px; align-items:flex-end; height:22px; margin-top:14px; justify-content:center;}
   .barcode div{width:2px; background:var(--text-faint); opacity:.5;}
 
@@ -359,7 +360,8 @@
   .order-item .chevron{color:var(--text-faint); font-size:14px; flex-shrink:0;}
   .badge{font-size:9.5px; padding:3px 7px; border-radius:999px; background:var(--green-soft); color:var(--green); font-weight:600; letter-spacing:.3px; display:inline-block; margin-top:3px;}
   .badge.cancelled{ background:var(--danger-soft); color:var(--danger); }
-  .badge.refunded{ background:var(--gold-soft); color:var(--gold); }
+  .badge.refunded{ background:var(--danger-soft); color:var(--danger); }
+  .badge.processing{ background:var(--accent-soft); color:var(--accent-2); }
   .order-loading{ text-align:center; padding:40px 20px; color:var(--text-faint); font-size:12.5px; }
 
   .filter-row{
@@ -1865,14 +1867,18 @@ function fmtDateFrom(iso){
 }
 
 // Статус хранится в колонке purchases.status ('completed' по умолчанию).
-// Сюда же подставляем 'cancelled' и 'refunded', когда их выставляют вручную/ботом поддержки.
+// 'cancelled' и 'refunded' показывают один и тот же объединённый статус —
+// "Отменён" в списке заказов, а внутри чека сразу дописывается, что средства
+// возвращены (без отдельного статуса "возврат оформлен").
+// Любое другое/пустое значение (например 'processing') считаем ещё не завершённым
+// заказом и показываем "Обрабатывается".
 function orderStatusMeta(status){
   const map = {
     completed: { label:'Выполнен', badgeClass:'', stampClass:'', stampText:'✓ ОПЛАЧЕНО · ВЫПОЛНЕНО' },
-    cancelled: { label:'Отменён', badgeClass:'cancelled', stampClass:'cancelled', stampText:'✕ ЗАКАЗ ОТМЕНЁН' },
-    refunded:  { label:'Возврат оформлен', badgeClass:'refunded', stampClass:'refunded', stampText:'↩ СРЕДСТВА ВОЗВРАЩЕНЫ' }
+    cancelled: { label:'Отменён', badgeClass:'cancelled', stampClass:'cancelled', stampText:'✕ ОТМЕНЁН · СРЕДСТВА ВОЗВРАЩЕНЫ' },
+    refunded:  { label:'Отменён', badgeClass:'cancelled', stampClass:'cancelled', stampText:'✕ ОТМЕНЁН · СРЕДСТВА ВОЗВРАЩЕНЫ' }
   };
-  return map[status] || { label: status || 'Обработка', badgeClass:'', stampClass:'', stampText:'' };
+  return map[status] || { label:'Обрабатывается', badgeClass:'processing', stampClass:'processing', stampText:'⏳ ЗАКАЗ ОБРАБАТЫВАЕТСЯ' };
 }
 
 // Тянем историю заказов пользователя напрямую из таблицы purchases (как products для каталога).
@@ -1965,7 +1971,7 @@ function orderReceiptHTML(o){
       <div class="k">KitsaiGG</div>
       <div class="id">чек № ${orderNumber(o.id)} · ${o.date}</div>
     </div>
-    <div class="receipt-row"><span>ID заказа</span><span class="fill"></span><span class="value" style="font-family:var(--font-mono); font-size:10.5px;">${o.id}</span></div>
+    <div class="receipt-row"><span>ID заказа</span><span class="fill"></span><span class="value copy-id" data-copy="${o.id}" style="font-family:var(--font-mono); font-size:10.5px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;">${o.id}</span></div>
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${o.title}</span></div>
     ${o.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${o.recipient}</span></div>` : ''}
     ${o.kcoinUsed>0 ? `<div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${o.kcoinUsed.toLocaleString('ru-RU')} KC</span></div>` : ''}
@@ -1982,6 +1988,30 @@ function openOrderDetail(id){
   state.currentOrderId = order.id;
   document.getElementById('orderDetailReceipt').innerHTML = orderReceiptHTML(order);
   pushView('order-detail', {sub:true, title:'Чек заказа'});
+}
+
+// Копирует текст в буфер обмена (с фолбэком для окружений без navigator.clipboard,
+// например старых WebView в Telegram Desktop) и показывает тост об успехе.
+async function copyToClipboard(text){
+  try {
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast('ID заказа скопирован');
+  } catch(e){
+    console.error('copyToClipboard error:', e);
+    showToast('Не удалось скопировать');
+  }
 }
 
 /* ---------------- TOPUP ---------------- */
@@ -2233,6 +2263,11 @@ function showToast(msg){
 
 /* ---------------- EVENT LISTENERS ATTACHMENT ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
+  // Копирование ID заказа по тапу на чеке (делегируем, т.к. чек вставляется динамически)
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('.copy-id');
+    if(el) copyToClipboard(el.dataset.copy);
+  });
   // Инициализация Telegram WebApp
   if (window.Telegram && window.Telegram.WebApp) {
     try {
