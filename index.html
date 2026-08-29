@@ -2242,7 +2242,7 @@ async function confirmPurchase(){
     state.orders.unshift({
       id, cat:p.cat, glyph:p.glyph, title:p.title, recipient:p.recipient,
       price:p.price, kcoinUsed:kcoinUsedFinal, cashback:cashbackFinal,
-      status:'completed', reviewDismissed:false, createdAt:new Date().toISOString(), date:fmtDate()
+      status:'processing', reviewDismissed:false, createdAt:new Date().toISOString(), date:fmtDate()
     });
     // Настоящее состояние (в т.ч. статус/возврат) подтянется из Supabase
     // при следующем открытии вкладки «Заказы» — форсируем перезапрос.
@@ -2336,7 +2336,7 @@ async function loadOrders(){
       price: Number(row.price_rub) || 0,
       kcoinUsed: Number(row.kcoin_used) || 0,
       cashback: Number(row.cashback) || 0,
-      status: row.status || 'completed',
+      status: row.status || 'processing',
       reviewDismissed: !!row.review_dismissed,
       createdAt: row.created_at,
       date: fmtDateFrom(row.created_at)
