@@ -759,8 +759,7 @@
 
       <div class="section-label" style="margin-top:6px;">Поддержка</div>
       <div class="list-link" id="linkSupport"><div class="l"><span class="ic">💬</span>Написать в поддержку</div><div class="r">›</div></div>
-      <div class="list-link" id="linkTicket"><div class="l"><span class="ic">🎫</span>Создать тикет</div><div class="r">›</div></div>
-      <div class="list-link" id="linkRules"><div class="l"><span class="ic">📄</span>Правила сервиса</div><div class="r">›</div></div>
+      <div class="list-link" id="linkReviews"><div class="l"><span class="ic">⭐</span>Посмотреть отзывы</div><div class="r">›</div></div>
 
       <div class="section-label" style="margin-top:6px;">Документы</div>
       <div class="list-link" id="linkTerms"><div class="l"><span class="ic">📜</span>Пользовательское соглашение</div><div class="r">›</div></div>
@@ -772,13 +771,14 @@
     <section class="view" data-view="support">
       <div class="empty-state" style="padding-top:20px;">
         <div class="glyph">💬</div>
-        <h3>Онлайн-чат поддержки</h3>
-        <p>Отвечаем обычно в течение 10–15 минут, круглосуточно.</p>
+        <h3>Поддержка</h3>
+        <p>Выберите удобный способ связи — отвечаем обычно в течение 10–15 минут, круглосуточно.</p>
       </div>
       <div class="note-box">
-        Кнопка ниже открывает чат с ботом поддержки в Telegram — там же можно приложить скриншот чека.
+        Чат в Telegram — для быстрых вопросов и скриншотов. Тикет — если нужно детально описать проблему с заказом.
       </div>
-      <button class="btn-primary" id="btnTgSupport">Открыть чат в Telegram</button>
+      <button class="btn-primary" id="btnTgSupport">Написать в чат</button>
+      <button class="btn-secondary" id="btnGoTicket">Создать тикет</button>
       <button class="btn-secondary" id="btnSupportBack">Назад</button>
     </section>
 
@@ -2800,8 +2800,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('ticketOrder').value = orderNumber(state.currentOrderId);
     pushView('support', {sub:true, title:'Поддержка'});
   });
-  document.getElementById('linkTicket').addEventListener('click', () => pushView('ticket', {sub:true, title:'Новый тикет'}));
-  document.getElementById('linkRules').addEventListener('click', () => pushView('rules', {sub:true, title:'Правила сервиса'}));
+  document.getElementById('linkReviews').addEventListener('click', () => openExternalLink(REVIEW_GROUP_URL));
   document.getElementById('linkTerms').addEventListener('click', () => pushView('terms', {sub:true, title:'Пользовательское соглашение'}));
   document.getElementById('linkPrivacy').addEventListener('click', () => pushView('privacy', {sub:true, title:'Политика конфиденциальности'}));
   document.getElementById('linkRefundPolicy').addEventListener('click', () => pushView('refund-policy', {sub:true, title:'Политика возвратов'}));
@@ -2815,6 +2814,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Открыть чат поддержки в Telegram
   document.getElementById('btnTgSupport').addEventListener('click', () => {
     openExternalLink('https://t.me/kitsaigg_support');
+  });
+
+  // Перейти к созданию тикета из экрана поддержки
+  document.getElementById('btnGoTicket').addEventListener('click', () => {
+    pushView('ticket', {sub:true, title:'Новый тикет'});
   });
 
   // Отправка тикета
