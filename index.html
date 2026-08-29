@@ -328,6 +328,8 @@
     border:1px solid var(--green); border-radius:6px; padding:5px; transform:rotate(-1deg);
     background:var(--green-soft);
   }
+  .receipt .stamp.cancelled{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+  .receipt .stamp.refunded{ color:var(--gold); border-color:var(--gold); background:var(--gold-soft); }
   .barcode{display:flex; gap:2px; align-items:flex-end; height:22px; margin-top:14px; justify-content:center;}
   .barcode div{width:2px; background:var(--text-faint); opacity:.5;}
 
@@ -345,14 +347,20 @@
   .order-item{
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
     padding:13px 14px; margin-bottom:9px; display:flex; align-items:center; gap:12px;
+    cursor:pointer; transition:border-color .15s;
   }
+  .order-item:active{ border-color:var(--accent); }
   .order-item .glyph{width:36px; height:36px; border-radius:99px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;}
   .order-item .meta{flex:1; min-width:0;}
   .order-item .meta h4{font-size:13px; font-weight:600;}
   .order-item .meta span{font-size:10.5px; color:var(--text-faint); font-family:var(--font-mono);}
   .order-item .right{text-align:right;}
   .order-item .right .price{font-family:var(--font-mono); font-weight:600; font-size:13px;}
+  .order-item .chevron{color:var(--text-faint); font-size:14px; flex-shrink:0;}
   .badge{font-size:9.5px; padding:3px 7px; border-radius:999px; background:var(--green-soft); color:var(--green); font-weight:600; letter-spacing:.3px; display:inline-block; margin-top:3px;}
+  .badge.cancelled{ background:var(--danger-soft); color:var(--danger); }
+  .badge.refunded{ background:var(--gold-soft); color:var(--gold); }
+  .order-loading{ text-align:center; padding:40px 20px; color:var(--text-faint); font-size:12.5px; }
 
   .filter-row{
     display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;
@@ -657,6 +665,14 @@
       <div id="ordersList"></div>
     </section>
 
+    <!-- ===================== ORDER DETAIL (ЧЕК) ===================== -->
+    <section class="view" data-view="order-detail">
+      <div class="receipt-wrap">
+        <div class="receipt" id="orderDetailReceipt"></div>
+      </div>
+      <button class="btn-secondary" id="btnOrderSupport">Написать в поддержку</button>
+    </section>
+
     <!-- ===================== PROFILE ===================== -->
     <section class="view" data-view="profile">
       <div class="profile-head">
@@ -826,6 +842,9 @@ const state = {
   kcoinBalance: 0,
   pendingKcoinToUse: null, // сколько KCoin списываем в текущем оформлении заказа
   orders: [],
+  ordersLoaded: false, // грузили ли уже историю заказов из Supabase хоть раз
+  ordersLoading: false,
+  currentOrderId: null, // id открытого сейчас чека (для кнопки "в поддержку")
   referral: { count: 0, earned: 0, code: '' },
   referrerId: null,
   currentCategory: null,
@@ -1160,7 +1179,7 @@ function goTab(tab){
   state.navStack = [tab];
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   showView(tab);
-  if(tab === 'orders') renderOrders();
+  if(tab === 'orders') loadOrders();
 }
 
 function pushView(name, opts){
@@ -1189,6 +1208,7 @@ function viewTitle(v){
     'list-product': LIST_CONFIG[state.currentCategory]?.title || '',
     'item-detail': state.currentListItem?.title || '',
     'checkout': 'Подтверждение заказа',
+    'order-detail': 'Чек заказа',
     'topup': 'Пополнение баланса'
   };
   return map[v] || '';
@@ -1792,11 +1812,18 @@ async function confirmPurchase(){
     renderBalance();
 
     const id = data.order_id;
-    p.kcoinUsedFinal = Number(data.kcoin_used || 0); // сколько реально списал сервер — источник правды для чека
+    const kcoinUsedFinal = Number(data.kcoin_used || 0);
+    const cashbackFinal = Number(data.cashback || 0);
+    p.kcoinUsedFinal = kcoinUsedFinal; // сколько реально списал сервер — источник правды для чека
     state.pendingKcoinToUse = 0;
     state.orders.unshift({
-      id, cat:p.cat, glyph:p.glyph, title:p.title, date:fmtDate(), price:p.price, status:'Выполнен'
+      id, cat:p.cat, glyph:p.glyph, title:p.title, recipient:p.recipient,
+      price:p.price, kcoinUsed:kcoinUsedFinal, cashback:cashbackFinal,
+      status:'completed', createdAt:new Date().toISOString(), date:fmtDate()
     });
+    // Настоящее состояние (в т.ч. статус/возврат) подтянется из Supabase
+    // при следующем открытии вкладки «Заказы» — форсируем перезапрос.
+    state.ordersLoaded = false;
 
     document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
     state.navStack = ['catalog','success'];
@@ -1816,25 +1843,145 @@ async function confirmPurchase(){
 }
 
 /* ---------------- ORDERS VIEW ---------------- */
+
+// Фолбэк-иконка по категории, если для неё нет глифа в RATE_CONFIG
+// (например category='other' — там глиф хранится на уровне товара, а не группы).
+function categoryGlyph(cat){
+  if(RATE_CONFIG[cat]?.glyph) return RATE_CONFIG[cat].glyph;
+  const fallback = { stars:'⭐', robux:'🟩', other:'🔑' };
+  return fallback[cat] || '🧾';
+}
+
+// Короткий "человеческий" номер чека, выведенный из настоящего id заказа в Supabase
+// (первые 8 символов uuid) — стабилен для одного и того же заказа.
+function orderNumber(id){
+  if(!id) return '—';
+  return 'KG-' + String(id).replace(/-/g,'').slice(0,8).toUpperCase();
+}
+
+function fmtDateFrom(iso){
+  const d = iso ? new Date(iso) : new Date();
+  return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'short'}) + ', ' + d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+}
+
+// Статус хранится в колонке purchases.status ('completed' по умолчанию).
+// Сюда же подставляем 'cancelled' и 'refunded', когда их выставляют вручную/ботом поддержки.
+function orderStatusMeta(status){
+  const map = {
+    completed: { label:'Выполнен', badgeClass:'', stampClass:'', stampText:'✓ ОПЛАЧЕНО · ВЫПОЛНЕНО' },
+    cancelled: { label:'Отменён', badgeClass:'cancelled', stampClass:'cancelled', stampText:'✕ ЗАКАЗ ОТМЕНЁН' },
+    refunded:  { label:'Возврат оформлен', badgeClass:'refunded', stampClass:'refunded', stampText:'↩ СРЕДСТВА ВОЗВРАЩЕНЫ' }
+  };
+  return map[status] || { label: status || 'Обработка', badgeClass:'', stampClass:'', stampText:'' };
+}
+
+// Тянем историю заказов пользователя напрямую из таблицы purchases (как products для каталога).
+// RLS должна фильтровать по telegram_id — здесь просто ограничиваем выборку тем же telegram_id.
+async function loadOrders(){
+  if(!supabaseClient || !state.telegramId){
+    renderOrders(state.currentOrdersFilter || 'all');
+    return;
+  }
+  state.ordersLoading = true;
+  renderOrders(state.currentOrdersFilter || 'all');
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('purchases')
+      .select('*')
+      .eq('telegram_id', state.telegramId)
+      .order('created_at', { ascending: false });
+
+    if(error){
+      console.error('loadOrders error:', error);
+      showToast('Не удалось загрузить заказы');
+      return;
+    }
+
+    state.orders = (data || []).map(row => ({
+      id: row.id,
+      cat: row.category,
+      glyph: categoryGlyph(row.category),
+      title: row.title,
+      recipient: row.recipient,
+      price: Number(row.price_rub) || 0,
+      kcoinUsed: Number(row.kcoin_used) || 0,
+      cashback: Number(row.cashback) || 0,
+      status: row.status || 'completed',
+      createdAt: row.created_at,
+      date: fmtDateFrom(row.created_at)
+    }));
+    state.ordersLoaded = true;
+  } catch(e){
+    console.error('loadOrders error:', e);
+    showToast('Не удалось загрузить заказы');
+  } finally {
+    state.ordersLoading = false;
+    renderOrders(state.currentOrdersFilter || 'all');
+  }
+}
+
 function renderOrders(filter='all'){
+  state.currentOrdersFilter = filter;
   const list = document.getElementById('ordersList');
+
+  if(state.ordersLoading && !state.ordersLoaded){
+    list.innerHTML = `<div class="order-loading">Загружаем чеки…</div>`;
+    return;
+  }
+
   const filtered = state.orders.filter(o => filter==='all' ? true : o.cat===filter);
   if(filtered.length === 0){
     list.innerHTML = `<div class="empty-state"><div class="glyph">🧾</div><h3>Пока пусто</h3><p>Здесь появятся чеки за купленные звёзды, Premium, Robux, ключи и карты.</p></div>`;
     return;
   }
-  list.innerHTML = filtered.map(o => `
-    <div class="order-item">
+  list.innerHTML = filtered.map(o => {
+    const meta = orderStatusMeta(o.status);
+    return `
+    <div class="order-item" data-order-id="${o.id}">
       <div class="glyph">${o.glyph}</div>
-      <div class="meta"><h4>${o.title}</h4><span>${o.id} · ${o.date}</span></div>
-      <div class="right"><div class="price">${rub(o.price)}</div><div class="badge">${o.status}</div></div>
+      <div class="meta"><h4>${o.title}</h4><span>${orderNumber(o.id)} · ${o.date}</span></div>
+      <div class="right"><div class="price">${rub(o.price)}</div><div class="badge ${meta.badgeClass}">${meta.label}</div></div>
+      <div class="chevron">›</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+  list.querySelectorAll('.order-item').forEach(el => {
+    el.addEventListener('click', () => openOrderDetail(el.dataset.orderId));
+  });
 }
 
 function filterOrders(f){
   document.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p.dataset.f===f));
   renderOrders(f);
+}
+
+// Полный чек по конкретному заказу — что куплено, номер заказа в Supabase, статус, возврат.
+function orderReceiptHTML(o){
+  const meta = orderStatusMeta(o.status);
+  return `
+    <div class="rhead">
+      <div class="k">KitsaiGG</div>
+      <div class="id">чек № ${orderNumber(o.id)} · ${o.date}</div>
+    </div>
+    <div class="receipt-row"><span>ID заказа</span><span class="fill"></span><span class="value" style="font-family:var(--font-mono); font-size:10.5px;">${o.id}</span></div>
+    <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${o.title}</span></div>
+    ${o.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${o.recipient}</span></div>` : ''}
+    ${o.kcoinUsed>0 ? `<div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${o.kcoinUsed.toLocaleString('ru-RU')} KC</span></div>` : ''}
+    ${o.cashback>0 ? `<div class="receipt-row"><span>Начислен кэшбек</span><span class="fill"></span><span class="value" style="color:var(--green)">+ ${o.cashback.toLocaleString('ru-RU')} KC</span></div>` : ''}
+    <div class="rtotal"><span class="lbl">Итого</span><span class="val">${rub(o.price)}</span></div>
+    ${meta.stampText ? `<div class="stamp ${meta.stampClass}">${meta.stampText}</div>` : ''}
+    <div class="barcode">${Array.from({length:28}).map(()=>`<div style="height:${8+Math.random()*14}px;"></div>`).join('')}</div>
+  `;
+}
+
+function openOrderDetail(id){
+  const order = state.orders.find(o => String(o.id) === String(id));
+  if(!order) return;
+  state.currentOrderId = order.id;
+  document.getElementById('orderDetailReceipt').innerHTML = orderReceiptHTML(order);
+  pushView('order-detail', {sub:true, title:'Чек заказа'});
 }
 
 /* ---------------- TOPUP ---------------- */
@@ -2189,6 +2336,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Ссылки в профиле
   document.getElementById('linkSupport').addEventListener('click', () => pushView('support', {sub:true, title:'Поддержка'}));
+  document.getElementById('btnOrderSupport').addEventListener('click', () => {
+    document.getElementById('ticketOrder').value = orderNumber(state.currentOrderId);
+    pushView('support', {sub:true, title:'Поддержка'});
+  });
   document.getElementById('linkTicket').addEventListener('click', () => pushView('ticket', {sub:true, title:'Новый тикет'}));
   document.getElementById('linkRules').addEventListener('click', () => pushView('rules', {sub:true, title:'Правила сервиса'}));
 
