@@ -244,6 +244,7 @@
     font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   }
   .stepper .n{font-family:var(--font-mono); font-weight:600; min-width:18px; text-align:center;}
+  .stepper button:disabled{opacity:.35; cursor:default;}
 
   /* ---------- Order bar ---------- */
   .order-bar{
@@ -933,6 +934,7 @@ function buildProductConfigs(rows){
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
         minQty: row.min_qty != null ? Number(row.min_qty) : null,
+        maxQty: row.max_qty != null ? Number(row.max_qty) : null,
         inputMode: row.input_mode === 'input' ? 'input' : 'chips'
       };
       CATALOG_ITEMS.push({
@@ -964,7 +966,8 @@ function buildProductConfigs(rows){
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
-        description: row.description || ''
+        description: row.description || '',
+        maxQty: row.max_qty != null ? Number(row.max_qty) : null
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1206,14 +1209,18 @@ function renderRateProduct(cat){
     customWrap.style.display = '';
     customInput.value = '';
     customInput.min = cfg.minQty || 1;
+    if(cfg.maxQty) customInput.max = cfg.maxQty; else customInput.removeAttribute('max');
     document.getElementById('rateCustomLabel').textContent = cfg.qtyLabel
-      + (cfg.minQty ? ' (минимум ' + cfg.minQty.toLocaleString('ru-RU') + ' ' + cfg.unit + ')' : ' (' + cfg.unit + ')');
+      + (cfg.minQty ? ' (минимум ' + cfg.minQty.toLocaleString('ru-RU') + ' ' + cfg.unit + ')' : ' (' + cfg.unit + ')')
+      + (cfg.maxQty ? ', максимум ' + cfg.maxQty.toLocaleString('ru-RU') : '');
     updateRateSummary();
     return;
   }
 
   grid.style.display = '';
-  cfg.options.forEach(opt => {
+  cfg.options
+    .filter(opt => !cfg.maxQty || opt <= cfg.maxQty)
+    .forEach(opt => {
     const price = Math.round(opt * cfg.rate);
     const chip = document.createElement('div');
     chip.className = 'chip';
@@ -1232,9 +1239,11 @@ function renderRateProduct(cat){
 
   customWrap.style.display = 'none';
   document.getElementById('rateCustomLabel').textContent = 'Своё количество (' + cfg.unit + ')'
-    + (cfg.minQty ? ', минимум ' + cfg.minQty.toLocaleString('ru-RU') : '');
+    + (cfg.minQty ? ', минимум ' + cfg.minQty.toLocaleString('ru-RU') : '')
+    + (cfg.maxQty ? ', максимум ' + cfg.maxQty.toLocaleString('ru-RU') : '');
   customInput.value = '';
   customInput.min = cfg.minQty || 1;
+  if(cfg.maxQty) customInput.max = cfg.maxQty; else customInput.removeAttribute('max');
 
   updateRateSummary();
 }
@@ -1260,7 +1269,8 @@ function applyCustomRateInput(cfg){
   const input = document.getElementById('rateCustomInput');
   const val = parseInt(input.value, 10);
   const min = cfg.minQty || 1;
-  state.rateSelected = (Number.isFinite(val) && val >= min) ? val : null;
+  const max = cfg.maxQty || Infinity;
+  state.rateSelected = (Number.isFinite(val) && val >= min && val <= max) ? val : null;
   updateRateSummary();
 }
 
@@ -1471,15 +1481,19 @@ function openItemDetail(item){
 }
 
 function changeItemQty(d){
-  state.itemQty = Math.max(1, Math.min(20, state.itemQty + d));
+  const max = state.currentListItem?.maxQty || 20;
+  state.itemQty = Math.max(1, Math.min(max, state.itemQty + d));
   updateItemSummary();
 }
 
 function updateItemSummary(){
   const item = state.currentListItem;
+  const max = item?.maxQty || 20;
   document.getElementById('itemQty').textContent = state.itemQty;
   document.getElementById('itemUnitPrice').textContent = rub(item.price);
   document.getElementById('itemTotalVal').textContent = rub(item.price * state.itemQty);
+  const plusBtn = document.getElementById('btnQtyPlus');
+  if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 }
 
 /* ---------------- BUY FLOW ---------------- */
