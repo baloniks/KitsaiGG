@@ -214,6 +214,14 @@
     overflow-wrap:break-word; word-break:break-word;
   }
 
+  .consent-row{
+    display:flex; align-items:flex-start; gap:9px; margin-top:14px;
+    font-size:12px; color:var(--text-muted); line-height:1.45; cursor:pointer;
+  }
+  .consent-row input{
+    flex:none; width:18px; height:18px; margin-top:1px; accent-color:var(--accent); cursor:pointer;
+  }
+
   /* ---------- Product list rows ---------- */
   .prod-row{
     display:flex; align-items:center; gap:12px;
@@ -530,12 +538,16 @@
         <input type="text" id="rateUsername" placeholder="@username">
         <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       </div>
-      <div class="product-description" id="rateDescription" style="display:none;"></div>
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— ₽</span></div>
       </div>
+      <div class="product-description" id="rateDescription" style="display:none;"></div>
+      <label class="consent-row" id="rateConsentWrap">
+        <input type="checkbox" id="rateConsent">
+        <span id="rateConsentText"></span>
+      </label>
       <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
     </section>
 
@@ -547,11 +559,15 @@
         <input type="text" id="premiumUsername" placeholder="@username">
         <div class="hint">Активация без пароля и без кода подтверждения.</div>
       </div>
-      <div class="product-description" id="premiumDescription" style="display:none;"></div>
       <div class="order-bar">
         <div class="row"><span>Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
       </div>
+      <div class="product-description" id="premiumDescription" style="display:none;"></div>
+      <label class="consent-row" id="premiumConsentWrap">
+        <input type="checkbox" id="premiumConsent">
+        <span id="premiumConsentText"></span>
+      </label>
       <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
     </section>
 
@@ -586,6 +602,10 @@
         <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— ₽</span></div>
       </div>
+      <label class="consent-row" id="itemConsentWrap">
+        <input type="checkbox" id="itemConsent">
+        <span id="itemConsentText"></span>
+      </label>
       <button class="btn-primary" id="btnItemBuy">Купить</button>
     </section>
 
@@ -1184,6 +1204,22 @@ function openCategory(cat){
   }
 }
 
+/* ---------------- CONSENT CHECKBOX (согласие с описанием / отсутствием возврата) ---------------- */
+function consentText(title, hasDescription){
+  return hasDescription
+    ? `Я ознакомился с выбранным способом доставки «${title}» и его описанием. Понимаю, что после оплаты возврат средств невозможен.`
+    : `Я ознакомился с условиями покупки «${title}». Понимаю, что после оплаты возврат средств невозможен.`;
+}
+
+// Настраивает чекбокс согласия под конкретный товар: подставляет текст,
+// сбрасывает отметку при каждом открытии и вешает пересчёт кнопки при клике.
+function setupConsent(prefix, title, hasDescription, onChange){
+  document.getElementById(prefix + 'ConsentText').textContent = consentText(title, hasDescription);
+  const checkbox = document.getElementById(prefix + 'Consent');
+  checkbox.checked = false;
+  checkbox.onchange = onChange;
+}
+
 function renderRateProduct(cat){
   const cfg = RATE_CONFIG[cat];
   state.rateSelected = null;
@@ -1194,6 +1230,7 @@ function renderRateProduct(cat){
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.textContent = cfg.description;
   rateDesc.style.display = cfg.description ? '' : 'none';
+  setupConsent('rate', cfg.title, !!cfg.description, updateRateSummary);
   document.getElementById('rateUsername').value = '';
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
   document.getElementById('rateRateVal').textContent = '1 ' + cfg.unit + ' ≈ ' + cfg.rate.toFixed(2) + ' ₽';
@@ -1288,7 +1325,11 @@ function updateRateSummary(){
   document.getElementById('rateQtyVal').textContent = state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit;
   document.getElementById('rateTotalVal').textContent = rub(total);
   btn.textContent = 'Купить за ' + rub(total);
-  btn.classList.remove('disabled');
+  if(document.getElementById('rateConsent').checked){
+    btn.classList.remove('disabled');
+  } else {
+    btn.classList.add('disabled');
+  }
 }
 
 function renderPremiumProduct(){
@@ -1300,6 +1341,7 @@ function renderPremiumProduct(){
   const premiumDesc = document.getElementById('premiumDescription');
   premiumDesc.textContent = PREMIUM_DESCRIPTION;
   premiumDesc.style.display = PREMIUM_DESCRIPTION ? '' : 'none';
+  setupConsent('premium', 'Telegram Premium', !!PREMIUM_DESCRIPTION, updatePremiumSummary);
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
   PREMIUM_PLANS.forEach((p, i) => {
@@ -1332,7 +1374,11 @@ function updatePremiumSummary(){
   document.getElementById('premiumPlanVal').textContent = plan.label;
   document.getElementById('premiumTotalVal').textContent = rub(plan.price);
   btn.textContent = 'Купить за ' + rub(plan.price);
-  btn.classList.remove('disabled');
+  if(document.getElementById('premiumConsent').checked){
+    btn.classList.remove('disabled');
+  } else {
+    btn.classList.add('disabled');
+  }
 }
 
 /* ---------------- CATALOG VIEW: поиск, категории, подкатегории ---------------- */
@@ -1476,6 +1522,7 @@ function openItemDetail(item){
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.textContent = item.description;
   itemDesc.style.display = item.description ? '' : 'none';
+  setupConsent('item', item.title, !!item.description, updateItemSummary);
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
 }
@@ -1494,6 +1541,12 @@ function updateItemSummary(){
   document.getElementById('itemTotalVal').textContent = rub(item.price * state.itemQty);
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
+  const buyBtn = document.getElementById('btnItemBuy');
+  if(document.getElementById('itemConsent').checked){
+    buyBtn.classList.remove('disabled');
+  } else {
+    buyBtn.classList.add('disabled');
+  }
 }
 
 /* ---------------- BUY FLOW ---------------- */
@@ -1501,6 +1554,7 @@ function attemptBuy(type){
   let purchase;
   if(type === 'rate'){
     if(state.rateSelected == null) return;
+    if(!document.getElementById('rateConsent').checked){ showToast('Отметьте согласие с условиями покупки'); return; }
     const cfg = RATE_CONFIG[state.currentCategory];
     let username = null;
     if(cfg.needsField){
@@ -1519,6 +1573,7 @@ function attemptBuy(type){
     };
   } else if(type === 'premium'){
     if(state.premiumSelected == null) return;
+    if(!document.getElementById('premiumConsent').checked){ showToast('Отметьте согласие с условиями покупки'); return; }
     let username = null;
     if(PREMIUM_NEEDS_FIELD){
       username = document.getElementById('premiumUsername').value.trim();
@@ -1527,6 +1582,7 @@ function attemptBuy(type){
     const plan = PREMIUM_PLANS[state.premiumSelected];
     purchase = { cat:'stars', glyph:'💎', title:'Telegram Premium · ' + plan.label, recipient: username, price: plan.price };
   } else if(type === 'item'){
+    if(!document.getElementById('itemConsent').checked){ showToast('Отметьте согласие с условиями покупки'); return; }
     const item = state.currentListItem;
     let username = null;
     if(item.needsField){
