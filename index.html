@@ -1227,6 +1227,14 @@ const state = {
   // восстанавливала данные именно предыдущего товара, а не оставляла на
   // экране данные того, с которого только что ушли — см. goBack().
   itemDetailStack: [],
+  // Тот же самый механизм, что и itemDetailStack, но для карточек
+  // rate-product / premium-product / list-product (Stars, Robux, Telegram
+  // Premium и т.п.). У них нет отдельного объекта товара, только ключ
+  // категории (currentCategory), поэтому здесь хранится история этих
+  // ключей — иначе переход по related-links с одной такой карточки на
+  // другую необратимо затирал currentCategory, и кнопка "назад" не могла
+  // ни узнать, ни перерисовать предыдущую карточку — см. goBack().
+  categoryStack: [],
   itemQty: 1,
   itemVariantSelected: null,
   topupAmount: null,
@@ -1800,6 +1808,7 @@ function showView(name, {sub=false, title=''} = {}){
 function goTab(tab){
   state.navStack = [tab];
   state.itemDetailStack = [];
+  state.categoryStack = [];
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   showView(tab);
   if(tab === 'orders') loadOrders();
@@ -1810,6 +1819,14 @@ function pushView(name, opts){
   showView(name, opts);
 }
 
+const CATEGORY_VIEWS = ['rate-product', 'premium-product', 'list-product'];
+
+function renderCategoryView(view, cat){
+  if(view === 'rate-product') renderRateProduct(cat);
+  else if(view === 'premium-product') renderPremiumProduct(cat);
+  else if(view === 'list-product') renderListProduct(cat);
+}
+
 function goBack(){
   if (state.navStack.length > 1) {
     const leaving = state.navStack.pop();
@@ -1818,6 +1835,13 @@ function goBack(){
     // данными того товара, с которого мы уходим (см. renderItemDetail).
     if(leaving === 'item-detail' && state.itemDetailStack.length){
       state.itemDetailStack.pop();
+    }
+    // То же самое для rate-product/premium-product/list-product: уходя с
+    // такой карточки, снимаем её категорию со стека, иначе после возврата
+    // на предыдущую такую же по типу карточку currentCategory останется
+    // указывать на ту, с которой мы уходим (см. ниже и openCategory).
+    if(CATEGORY_VIEWS.includes(leaving) && state.categoryStack.length){
+      state.categoryStack.pop();
     }
   }
   const prev = state.navStack[state.navStack.length-1] || 'catalog';
@@ -1831,6 +1855,12 @@ function goBack(){
     // экране данные товара, с которого только что ушли.
     if(prev === 'item-detail' && state.itemDetailStack.length){
       renderItemDetail(state.itemDetailStack[state.itemDetailStack.length-1]);
+    } else if(CATEGORY_VIEWS.includes(prev) && state.categoryStack.length){
+      // Аналогично: восстанавливаем currentCategory предыдущей карточки
+      // этого типа и перерисовываем её заново, а не оставляем на экране
+      // данные той, с которой только что ушли.
+      state.currentCategory = state.categoryStack[state.categoryStack.length-1];
+      renderCategoryView(prev, state.currentCategory);
     }
     showView(prev, {sub:true, title: viewTitle(prev)});
   }
@@ -1852,6 +1882,7 @@ function viewTitle(v){
 /* ---------------- CATEGORY & PRODUCT RENDERING ---------------- */
 function openCategory(cat){
   state.currentCategory = cat;
+  state.categoryStack.push(cat);
   if(RATE_CONFIG[cat]){
     renderRateProduct(cat);
     pushView('rate-product', {sub:true, title:RATE_CONFIG[cat].title});
@@ -2651,6 +2682,7 @@ async function confirmPurchase(){
     document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
     state.navStack = ['catalog','success'];
     state.itemDetailStack = [];
+    state.categoryStack = [];
     showView('success', {sub:true, title:'Готово'});
     renderReviewBanner();
 
