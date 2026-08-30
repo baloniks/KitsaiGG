@@ -611,10 +611,10 @@
       <div class="field" id="premiumFieldWrap">
         <label id="premiumFieldLabel">Юзернейм получателя</label>
         <input type="text" id="premiumUsername" placeholder="@username">
-        <div class="hint">Активация без пароля и без кода подтверждения.</div>
+        <div class="hint" id="premiumHint">Активация без пароля и без кода подтверждения.</div>
       </div>
       <div class="order-bar">
-        <div class="row"><span>Подписка</span><span id="premiumPlanVal">—</span></div>
+        <div class="row"><span id="premiumPlanLabel">Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
       </div>
       <div class="product-description" id="premiumDescription" style="display:none;"></div>
@@ -1344,8 +1344,13 @@ let CATALOG_ITEMS = [];
 //   rate          numeric — цена за 1 единицу в рублях (только для type='rate')
 //   options       numeric[] — доступные объёмы для покупки (только для type='rate')
 //   field_label   text    — подпись поля получателя (только для type='rate')
-//   qty_label     text    — подпись количества (только для type='rate')
-//   hint          text    — подсказка под полем получателя (только для type='rate')
+//   hint          text    — подсказка под полем получателя; для type='rate' —
+//                          обычный текст, для type='more-item' — тоже подсказка
+//                          под полем получателя (по умолчанию "Активация без
+//                          пароля и без кода подтверждения.", пустая строка её уберёт)
+//   qty_label     text    — для type='rate' — подпись количества; для
+//                          type='more-item' — подпись строки над ценой
+//                          (по умолчанию "Подписка", можно поставить "Тариф" и т.п.)
 //   variants      jsonb   — массив {label, price[, ...]}; для type='more-item' — тарифы/планы (label, months, price),
 //                          для type='list-item' — номиналы/варианты товара (label, price)
 //   sort_order    int     — порядок сортировки
@@ -1397,7 +1402,17 @@ function buildProductConfigs(rows){
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
-        consentText: row.consent_text || ''
+        consentText: row.consent_text || '',
+        // Название строки над ценой в блоке "Итого" (по умолчанию "Подписка").
+        // Задаётся через колонку qty_label — для type='more-item' она больше
+        // ничем не используется, так что можно свободно писать сюда своё слово
+        // (например "Тариф" или "Срок").
+        planLabel: (row.qty_label && String(row.qty_label).trim()) ? row.qty_label : 'Подписка',
+        // Текст подсказки под полем получателя (по умолчанию — про активацию
+        // без пароля/кода). Задаётся через колонку hint — для type='more-item'
+        // она больше ничем не используется. Оставьте пустой строкой в таблице,
+        // чтобы подсказка вообще не показывалась.
+        hint: row.hint != null ? row.hint : 'Активация без пароля и без кода подтверждения.'
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1794,6 +1809,8 @@ function renderPremiumProduct(id){
   document.getElementById('premiumFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('premiumUsername').value = '';
+  document.getElementById('premiumPlanLabel').textContent = cfg.planLabel;
+  document.getElementById('premiumHint').textContent = cfg.hint;
   const premiumDesc = document.getElementById('premiumDescription');
   premiumDesc.textContent = cfg.description;
   premiumDesc.style.display = cfg.description ? '' : 'none';
