@@ -595,6 +595,10 @@
         <input type="text" id="rateUsername" placeholder="@username">
         <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       </div>
+      <div class="field" id="rateFieldWrap2">
+        <label id="rateFieldLabel2">—</label>
+        <input type="text" id="rateUsername2" placeholder="">
+      </div>
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
@@ -615,6 +619,10 @@
         <label id="premiumFieldLabel">Юзернейм получателя</label>
         <input type="text" id="premiumUsername" placeholder="@username">
         <div class="hint" id="premiumHint">Активация без пароля и без кода подтверждения.</div>
+      </div>
+      <div class="field" id="premiumFieldWrap2">
+        <label id="premiumFieldLabel2">—</label>
+        <input type="text" id="premiumUsername2" placeholder="">
       </div>
       <div class="order-bar">
         <div class="row"><span id="premiumPlanLabel">Подписка</span><span id="premiumPlanVal">—</span></div>
@@ -645,6 +653,10 @@
       <div class="field" id="itemFieldWrap">
         <label id="itemFieldLabel">Куда доставить</label>
         <input type="text" id="itemUsername" placeholder="@username или ник в игре">
+      </div>
+      <div class="field" id="itemFieldWrap2">
+        <label id="itemFieldLabel2">—</label>
+        <input type="text" id="itemUsername2" placeholder="">
       </div>
       <div class="chip-grid" id="itemVariants" style="display:none; grid-template-columns:1fr 1fr 1fr; margin-top:12px;"></div>
       <div class="stepper-row" id="itemQtyWrap">
@@ -1375,6 +1387,16 @@ let CATALOG_ITEMS = [];
 //                          'Выберите вариант' для type='list-item' с вариантами.
 //                          Задайте свой текст, если нужна другая формулировка
 //                          (например, 'Выберите пакет', 'Укажите номинал').
+//   field_label_2 text     — подпись ВТОРОГО поля ввода (например, "Сервер",
+//                          "Пароль от аккаунта", "ID транзакции"). Второе поле
+//                          — необязательное: показывается только если это
+//                          поле заполнено; оставьте NULL/пустым, если товару
+//                          нужно только одно поле получателя.
+//   field_placeholder_2 text — плейсхолдер второго поля (необязательно)
+//   username_format_2 text[] — проверка формата ВТОРОГО поля, работает точно
+//                          так же и с теми же значениями, что и username_format
+//                          (см. выше), но применяется отдельно ко второму полю
+//                          и не зависит от того, что выбрано в первом.
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1405,6 +1427,10 @@ function buildProductConfigs(rows){
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
         inputMode: row.input_mode === 'input' ? 'input' : 'chips',
         selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите сумму',
+        fieldLabel2: row.field_label_2 || '',
+        fieldPlaceholder2: row.field_placeholder_2 || '',
+        needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
+        usernameFormat2: normalizeUsernameFormat(row.username_format_2),
         usernameFormat: normalizeUsernameFormat(row.username_format)
       };
       CATALOG_ITEMS.push({
@@ -1436,7 +1462,11 @@ function buildProductConfigs(rows){
         // чтобы подсказка вообще не показывалась.
         hint: row.hint != null ? row.hint : 'Активация без пароля и без кода подтверждения.',
         usernameFormat: normalizeUsernameFormat(row.username_format),
-        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите срок'
+        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите срок',
+        fieldLabel2: row.field_label_2 || '',
+        fieldPlaceholder2: row.field_placeholder_2 || '',
+        needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
+        usernameFormat2: normalizeUsernameFormat(row.username_format_2)
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1460,7 +1490,11 @@ function buildProductConfigs(rows){
         consentText: row.consent_text || '',
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
         usernameFormat: normalizeUsernameFormat(row.username_format),
-        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите вариант'
+        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите вариант',
+        fieldLabel2: row.field_label_2 || '',
+        fieldPlaceholder2: row.field_placeholder_2 || '',
+        needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
+        usernameFormat2: normalizeUsernameFormat(row.username_format_2)
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1776,6 +1810,10 @@ function renderRateProduct(cat){
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('rateHint').textContent = cfg.hint;
+  document.getElementById('rateFieldWrap2').style.display = cfg.needsField2 ? '' : 'none';
+  document.getElementById('rateFieldLabel2').textContent = cfg.fieldLabel2;
+  document.getElementById('rateUsername2').placeholder = cfg.fieldPlaceholder2 || '';
+  document.getElementById('rateUsername2').value = '';
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.textContent = cfg.description;
   rateDesc.style.display = cfg.description ? '' : 'none';
@@ -1889,6 +1927,10 @@ function renderPremiumProduct(id){
   document.getElementById('premiumFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('premiumUsername').value = '';
+  document.getElementById('premiumFieldWrap2').style.display = cfg.needsField2 ? '' : 'none';
+  document.getElementById('premiumFieldLabel2').textContent = cfg.fieldLabel2;
+  document.getElementById('premiumUsername2').placeholder = cfg.fieldPlaceholder2 || '';
+  document.getElementById('premiumUsername2').value = '';
   document.getElementById('premiumPlanLabel').textContent = cfg.planLabel;
   document.getElementById('premiumHint').textContent = cfg.hint;
   const premiumDesc = document.getElementById('premiumDescription');
@@ -2074,6 +2116,10 @@ function openItemDetail(item){
   document.getElementById('itemFieldLabel').textContent = item.fieldLabel;
   document.getElementById('itemUsername').placeholder = item.fieldPlaceholder || '@username или ник в игре';
   document.getElementById('itemUsername').value = '';
+  document.getElementById('itemFieldWrap2').style.display = item.needsField2 ? '' : 'none';
+  document.getElementById('itemFieldLabel2').textContent = item.fieldLabel2;
+  document.getElementById('itemUsername2').placeholder = item.fieldPlaceholder2 || '';
+  document.getElementById('itemUsername2').value = '';
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.textContent = item.description;
   itemDesc.style.display = item.description ? '' : 'none';
@@ -2177,11 +2223,20 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
+    let username2 = null;
+    if(cfg.needsField2){
+      username2 = document.getElementById('rateUsername2').value.trim();
+      if(!username2){ showToast('Заполните поле «' + cfg.fieldLabel2 + '»'); return; }
+      {
+        const check = checkRecipientFormat(username2, cfg.usernameFormat2);
+        if(!check.ok){ showToast(check.msg); return; }
+      }
+    }
     const total = Math.round(state.rateSelected * cfg.rate);
     purchase = {
       cat: (RATE_ORDER_CAT[state.currentCategory] || 'game'), glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
-      recipient: username, price: total,
+      recipient: username, recipient2: username2, field2Label: cfg.fieldLabel2, price: total,
       // price выше — только для локального отображения чека до ответа сервера;
       // реальную цену на бэкенде считает create-order по product_id + qty.
       product_id: state.currentCategory,
@@ -2200,10 +2255,19 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
+    let username2 = null;
+    if(moreItemCfg.needsField2){
+      username2 = document.getElementById('premiumUsername2').value.trim();
+      if(!username2){ showToast('Заполните поле «' + moreItemCfg.fieldLabel2 + '»'); return; }
+      {
+        const check = checkRecipientFormat(username2, moreItemCfg.usernameFormat2);
+        if(!check.ok){ showToast(check.msg); return; }
+      }
+    }
     const plan = moreItemCfg.plans[state.premiumSelected];
     purchase = {
       cat: (MORE_ITEM_ORDER_CAT[state.currentCategory] || 'services'), glyph: moreItemCfg.glyph || '💎', title: moreItemCfg.title + ' · ' + plan.label,
-      recipient: username, price: plan.price,
+      recipient: username, recipient2: username2, field2Label: moreItemCfg.fieldLabel2, price: plan.price,
       product_id: state.currentCategory,
       plan_index: state.premiumSelected
     };
@@ -2220,12 +2284,21 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
+    let username2 = null;
+    if(item.needsField2){
+      username2 = document.getElementById('itemUsername2').value.trim();
+      if(!username2){ showToast('Заполните поле «' + item.fieldLabel2 + '»'); return; }
+      {
+        const check = checkRecipientFormat(username2, item.usernameFormat2);
+        if(!check.ok){ showToast(check.msg); return; }
+      }
+    }
     const variant = item.variants ? item.variants[state.itemVariantSelected] : null;
     const unitPrice = variant ? Number(variant.price) || 0 : item.price;
     purchase = {
       cat:'key', glyph:item.glyph,
       title: item.title + (variant ? ' · ' + variant.label : '') + (state.itemQty>1 ? ' × '+state.itemQty : ''),
-      recipient: username, price: unitPrice * state.itemQty,
+      recipient: username, recipient2: username2, field2Label: item.fieldLabel2, price: unitPrice * state.itemQty,
       product_id: item.id,
       qty: state.itemQty,
       variant_index: item.variants ? state.itemVariantSelected : null
@@ -2248,6 +2321,7 @@ function receiptHTML(p, id, stamped){
     </div>
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${p.title}</span></div>
     ${p.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${p.recipient}</span></div>` : ''}
+    ${p.recipient2 ? `<div class="receipt-row"><span>${p.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${p.recipient2}</span></div>` : ''}
     <div class="receipt-row"><span>Способ оплаты</span><span class="fill"></span><span class="value">${kcoinUsed>0 ? (rubDue>0 ? 'Баланс + KCoin' : 'KCoin') : 'Баланс KitsaiGG'}</span></div>
     ${kcoinUsed>0 ? `
     <div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${kcoinUsed.toLocaleString('ru-RU')} KC</span></div>
@@ -2395,6 +2469,7 @@ async function confirmPurchase(){
         plan_index: p.plan_index,
         variant_index: p.variant_index,
         recipient: p.recipient,
+        recipient2: p.recipient2,
         kcoin_to_use: kcoinToUse
       }
     });
@@ -2424,6 +2499,7 @@ async function confirmPurchase(){
     state.pendingKcoinToUse = 0;
     state.orders.unshift({
       id, cat:p.cat, glyph:p.glyph, title:p.title, recipient:p.recipient,
+      recipient2:p.recipient2, field2Label:p.field2Label,
       price:p.price, kcoinUsed:kcoinUsedFinal, cashback:cashbackFinal,
       status:'processing', reviewDismissed:false, createdAt:new Date().toISOString(), date:fmtDate()
     });
@@ -2516,6 +2592,8 @@ async function loadOrders(){
       glyph: categoryGlyph(row.category),
       title: row.title,
       recipient: row.recipient,
+      recipient2: row.recipient2,
+      field2Label: row.field2_label,
       price: Number(row.price_rub) || 0,
       kcoinUsed: Number(row.kcoin_used) || 0,
       cashback: Number(row.cashback) || 0,
