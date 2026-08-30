@@ -1351,7 +1351,8 @@ let CATALOG_ITEMS = [];
 //   field_label   text    — подпись поля получателя (только для type='rate')
 //   qty_label     text    — подпись количества (только для type='rate')
 //   hint          text    — подсказка под полем получателя (только для type='rate')
-//   premium_plans jsonb   — массив {label, months, price} (только для type='premium')
+//   variants      jsonb   — массив {label, price[, ...]}; для type='premium' — тарифы (label, months, price),
+//                          для type='list-item' — номиналы/варианты товара (label, price)
 //   sort_order    int     — порядок сортировки
 //   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
 function buildProductConfigs(rows){
@@ -1398,7 +1399,7 @@ function buildProductConfigs(rows){
 
     } else if(row.type === 'premium'){
       PREMIUM_PRODUCT_ID = row.id;
-      PREMIUM_PLANS = Array.isArray(row.premium_plans) ? row.premium_plans : [];
+      PREMIUM_PLANS = Array.isArray(row.variants) ? row.variants : [];
       PREMIUM_FIELD_LABEL = row.field_label || '';
       PREMIUM_FIELD_PLACEHOLDER = row.field_placeholder || '';
       PREMIUM_NEEDS_FIELD = !!(row.field_label && String(row.field_label).trim());
