@@ -820,6 +820,7 @@
       <div class="list-link" id="linkTerms"><div class="l"><span class="ic">📜</span>Пользовательское соглашение</div><div class="r">›</div></div>
       <div class="list-link" id="linkPrivacy"><div class="l"><span class="ic">🔒</span>Политика конфиденциальности</div><div class="r">›</div></div>
       <div class="list-link" id="linkRefundPolicy"><div class="l"><span class="ic">↩️</span>Политика возвратов</div><div class="r">›</div></div>
+      <div class="list-link" id="linkAboutUs"><div class="l"><span class="ic">ℹ️</span>О нас</div><div class="r">›</div></div>
     </section>
 
     <!-- ===================== SUPPORT ===================== -->
@@ -1132,6 +1133,26 @@
         <p style="margin-bottom:0;"><strong style="color:var(--text-muted);">6.4.</strong> В иных случаях вопрос о возврате денежных средств рассматривается индивидуально с учётом обстоятельств конкретного заказа и требований законодательства.</p>
       </div>
       <button class="btn-secondary" id="btnRefundPolicyBack" style="margin-top:18px;">Назад</button>
+    </section>
+
+    <!-- ===================== О НАС ===================== -->
+    <section class="view" data-view="about-us">
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.75;">
+        <p style="margin-bottom:8px; color:var(--text); font-weight:600; font-size:14px;">ИП Стаценко Виктория Николаевна</p>
+
+        <h3 style="color:var(--text); font-size:14px; font-weight:600; margin:20px 0 8px;">Реквизиты</h3>
+        <ul style="margin:0 0 8px 18px; padding:0;">
+          <li style="margin-bottom:4px;">ИНН: 550116447604</li>
+          <li style="margin-bottom:4px;">ОГРНИП: 314554327300040</li>
+        </ul>
+
+        <h3 style="color:var(--text); font-size:14px; font-weight:600; margin:20px 0 8px;">Контакты</h3>
+        <ul style="margin:0 0 8px 18px; padding:0;">
+          <li style="margin-bottom:4px;">Электронная почта: <a href="mailto:support@kitsaigg.ru" style="color:var(--accent-2);">support@kitsaigg.ru</a></li>
+          <li style="margin-bottom:4px;">Аккаунт менеджера: <a href="https://t.me/Manager_KitsaiGG" style="color:var(--accent-2);" id="linkAboutUsManager">https://t.me/Manager_KitsaiGG</a></li>
+        </ul>
+      </div>
+      <button class="btn-secondary" id="btnAboutUsBack" style="margin-top:18px;">Назад</button>
     </section>
 
     <!-- ===================== TOP-UP ===================== -->
@@ -3236,12 +3257,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('linkTerms').addEventListener('click', () => pushView('terms', {sub:true, title:'Пользовательское соглашение'}));
   document.getElementById('linkPrivacy').addEventListener('click', () => pushView('privacy', {sub:true, title:'Политика конфиденциальности'}));
   document.getElementById('linkRefundPolicy').addEventListener('click', () => pushView('refund-policy', {sub:true, title:'Политика возвратов'}));
+  document.getElementById('linkAboutUs').addEventListener('click', () => pushView('about-us', {sub:true, title:'О нас'}));
+  document.getElementById('linkAboutUsManager').addEventListener('click', (e) => { e.preventDefault(); openExternalLink('https://t.me/Manager_KitsaiGG'); });
 
   document.getElementById('btnSupportBack').addEventListener('click', goBack);
   document.getElementById('btnRulesBack').addEventListener('click', goBack);
   document.getElementById('btnTermsBack').addEventListener('click', goBack);
   document.getElementById('btnPrivacyBack').addEventListener('click', goBack);
   document.getElementById('btnRefundPolicyBack').addEventListener('click', goBack);
+  document.getElementById('btnAboutUsBack').addEventListener('click', goBack);
 
   // Открыть чат поддержки в Telegram
   document.getElementById('btnTgSupport').addEventListener('click', () => {
