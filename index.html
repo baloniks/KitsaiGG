@@ -1143,14 +1143,7 @@
         <input type="number" id="topupCustom" placeholder="0 ₽">
       </div>
 
-      <div class="section-label">Способ оплаты</div>
-      <div class="paymethod">
-        <div class="pic">🤖</div>
-        <div class="pn"><h4>Crypto Bot (Telegram)</h4><span>USDT / TON / BTC / СБП</span></div>
-        <div class="radio-dot"></div>
-      </div>
-
-      <button class="btn-primary disabled" id="topupBtn">Выберите сумму</button>
+      <button class="btn-primary disabled" id="topupBtn">Оплата временно недоступна</button>
     </section>
 
   </main>
@@ -2908,13 +2901,9 @@ function selectTopupCustom(){
 
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
-  if(!state.topupAmount){
-    btn.textContent = 'Выберите сумму';
-    btn.classList.add('disabled');
-    return;
-  }
-  btn.classList.remove('disabled');
-  btn.textContent = 'Перейти к оплате · ' + rub(state.topupAmount);
+  // Оплата временно скрыта — кнопка всегда неактивна, независимо от выбранной суммы.
+  btn.textContent = 'Оплата временно недоступна';
+  btn.classList.add('disabled');
 }
 
 function getTelegramInitData(){
@@ -2922,6 +2911,10 @@ function getTelegramInitData(){
 }
 
 async function startCryptoPayment(){
+  // Оплата через Crypto Bot временно скрыта/отключена.
+  showToast('Оплата временно недоступна');
+  return;
+
   if(!state.topupAmount) return;
   const btn = document.getElementById('topupBtn');
 
