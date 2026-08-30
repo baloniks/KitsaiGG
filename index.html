@@ -211,6 +211,10 @@
     font-size:12.5px; color:var(--text-muted); line-height:1.55; white-space:pre-line;
     overflow-wrap:break-word; word-break:break-word;
   }
+  .product-description-label{
+    font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text-faint);
+    font-family:var(--font-mono); margin-bottom:8px; white-space:normal;
+  }
 
   .consent-row{
     display:flex; align-items:flex-start; gap:9px; margin-top:14px;
@@ -611,6 +615,10 @@
         <span id="rateConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
+      <div class="product-description" id="rateDescription2" style="display:none;">
+        <div class="product-description-label">Описание</div>
+        <div id="rateDescription2Text"></div>
+      </div>
     </section>
 
     <!-- ===================== PREMIUM ===================== -->
@@ -635,6 +643,10 @@
         <span id="premiumConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
+      <div class="product-description" id="premiumDescription2" style="display:none;">
+        <div class="product-description-label">Описание</div>
+        <div id="premiumDescription2Text"></div>
+      </div>
     </section>
 
     <!-- ===================== LIST-BASED ===================== -->
@@ -678,6 +690,10 @@
         <span id="itemConsentText"></span>
       </label>
       <button class="btn-primary" id="btnItemBuy">Купить</button>
+      <div class="product-description" id="itemDescription2" style="display:none;">
+        <div class="product-description-label">Описание</div>
+        <div id="itemDescription2Text"></div>
+      </div>
     </section>
 
     <!-- ===================== CHECKOUT ===================== -->
@@ -1398,6 +1414,11 @@ let CATALOG_ITEMS = [];
 //                          так же и с теми же значениями, что и username_format
 //                          (см. выше), но применяется отдельно ко второму полю
 //                          и не зависит от того, что выбрано в первом.
+//   description_2 text     — доп. описание, которое показывается отдельным
+//                          блоком с подписью «Описание» в самом низу карточки
+//                          товара, ПОСЛЕ кнопки покупки (обычный description
+//                          остаётся на прежнем месте, до чекбокса согласия —
+//                          это независимое поле, заполняйте только если нужно).
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1421,6 +1442,7 @@ function buildProductConfigs(rows){
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
+        description2: row.description_2 || '',
         consentText: row.consent_text || '',
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
@@ -1451,6 +1473,7 @@ function buildProductConfigs(rows){
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
+        description2: row.description_2 || '',
         consentText: row.consent_text || '',
         // Название строки над ценой в блоке "Итого" (по умолчанию "Подписка").
         // Задаётся через колонку qty_label — для type='more-item' она больше
@@ -1488,6 +1511,7 @@ function buildProductConfigs(rows){
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
+        description2: row.description_2 || '',
         consentText: row.consent_text || '',
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
         usernameFormat: normalizeUsernameFormat(row.username_format),
@@ -1818,6 +1842,9 @@ function renderRateProduct(cat){
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.textContent = cfg.description;
   rateDesc.style.display = cfg.description ? '' : 'none';
+  const rateDesc2 = document.getElementById('rateDescription2');
+  document.getElementById('rateDescription2Text').textContent = cfg.description2;
+  rateDesc2.style.display = cfg.description2 ? '' : 'none';
   setupConsent('rate', cfg.title, !!cfg.description, updateRateSummary, cfg.consentText);
   document.getElementById('rateUsername').value = '';
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
@@ -1937,6 +1964,9 @@ function renderPremiumProduct(id){
   const premiumDesc = document.getElementById('premiumDescription');
   premiumDesc.textContent = cfg.description;
   premiumDesc.style.display = cfg.description ? '' : 'none';
+  const premiumDesc2 = document.getElementById('premiumDescription2');
+  document.getElementById('premiumDescription2Text').textContent = cfg.description2;
+  premiumDesc2.style.display = cfg.description2 ? '' : 'none';
   setupConsent('premium', cfg.title, !!cfg.description, updatePremiumSummary, cfg.consentText);
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
@@ -2124,6 +2154,9 @@ function openItemDetail(item){
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.textContent = item.description;
   itemDesc.style.display = item.description ? '' : 'none';
+  const itemDesc2 = document.getElementById('itemDescription2');
+  document.getElementById('itemDescription2Text').textContent = item.description2;
+  itemDesc2.style.display = item.description2 ? '' : 'none';
 
   // Товар с несколькими номиналами (variants) — рисуем чипы выбора,
   // как у Telegram Premium; без variants блок просто скрыт.
