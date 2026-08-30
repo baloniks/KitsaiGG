@@ -197,7 +197,7 @@
     font-family:var(--font-mono); font-size:14px; outline:none;
   }
   .field input:focus{border-color:var(--accent);}
-  .field .hint{font-size:11px; color:var(--text-faint); margin-top:6px; line-height:1.4; overflow-wrap:break-word; word-break:break-word;}
+  .field .hint, .hint{font-size:11px; color:var(--text-faint); margin-top:6px; line-height:1.4; overflow-wrap:break-word; word-break:break-word;}
 
   .note-box{
     margin-top:16px; background:var(--surface); border:1px dashed var(--border);
@@ -594,12 +594,12 @@
       <div class="field" id="rateFieldWrap">
         <label id="rateFieldLabel">Юзернейм получателя</label>
         <input type="text" id="rateUsername" placeholder="@username">
-        <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       </div>
       <div class="field" id="rateFieldWrap2">
         <label id="rateFieldLabel2">—</label>
         <input type="text" id="rateUsername2" placeholder="">
       </div>
+      <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
@@ -619,12 +619,12 @@
       <div class="field" id="premiumFieldWrap">
         <label id="premiumFieldLabel">Юзернейм получателя</label>
         <input type="text" id="premiumUsername" placeholder="@username">
-        <div class="hint" id="premiumHint">Активация без пароля и без кода подтверждения.</div>
       </div>
       <div class="field" id="premiumFieldWrap2">
         <label id="premiumFieldLabel2">—</label>
         <input type="text" id="premiumUsername2" placeholder="">
       </div>
+      <div class="hint" id="premiumHint">Активация без пароля и без кода подтверждения.</div>
       <div class="order-bar">
         <div class="row"><span id="premiumPlanLabel">Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
