@@ -196,16 +196,16 @@
   }
   .related-links::-webkit-scrollbar{display:none;}
   .related-link{
-    flex:none; display:flex; flex-direction:column; align-items:center; gap:4px;
-    width:60px; padding:8px 4px; border:1px solid var(--border); border-radius:var(--radius-sm);
+    flex:none; display:flex; flex-direction:row; align-items:center; gap:6px;
+    max-width:150px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-sm);
     background:var(--surface); cursor:pointer; box-shadow:var(--shadow-card);
   }
   .related-link * { pointer-events:none; }
   .related-link:active{transform:scale(.95);}
-  .related-link .ico{font-size:18px; line-height:1;}
+  .related-link .ico{font-size:16px; line-height:1; flex:none;}
   .related-link .lbl{
-    font-size:9.5px; color:var(--text-muted); text-align:center; line-height:1.2;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word;
+    font-size:11.5px; color:var(--text-muted); text-align:left; line-height:1.25;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
 
   .field{margin-top:18px;}
@@ -1222,6 +1222,11 @@ const state = {
   rateSelected: null,
   premiumSelected: null,
   currentListItem: null,
+  // Стек товаров, открытых на экране item-detail (первый показ + переходы
+  // по related-links внутри самой карточки). Нужен, чтобы кнопка "назад"
+  // восстанавливала данные именно предыдущего товара, а не оставляла на
+  // экране данные того, с которого только что ушли — см. goBack().
+  itemDetailStack: [],
   itemQty: 1,
   itemVariantSelected: null,
   topupAmount: null,
@@ -1794,6 +1799,7 @@ function showView(name, {sub=false, title=''} = {}){
 
 function goTab(tab){
   state.navStack = [tab];
+  state.itemDetailStack = [];
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   showView(tab);
   if(tab === 'orders') loadOrders();
@@ -1806,7 +1812,13 @@ function pushView(name, opts){
 
 function goBack(){
   if (state.navStack.length > 1) {
-    state.navStack.pop();
+    const leaving = state.navStack.pop();
+    // Уходя с item-detail, снимаем этот товар со стека — иначе после
+    // возврата на предыдущую карточку товара она останется отрисованной
+    // данными того товара, с которого мы уходим (см. renderItemDetail).
+    if(leaving === 'item-detail' && state.itemDetailStack.length){
+      state.itemDetailStack.pop();
+    }
   }
   const prev = state.navStack[state.navStack.length-1] || 'catalog';
   const isTab = ['catalog','orders','profile'].includes(prev);
@@ -1814,6 +1826,12 @@ function goBack(){
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === prev));
     showView(prev);
   } else {
+    // Возвращаемся на item-detail — перерисовываем карточку тем товаром,
+    // который был там до перехода по related-links, а не оставляем на
+    // экране данные товара, с которого только что ушли.
+    if(prev === 'item-detail' && state.itemDetailStack.length){
+      renderItemDetail(state.itemDetailStack[state.itemDetailStack.length-1]);
+    }
     showView(prev, {sub:true, title: viewTitle(prev)});
   }
 }
@@ -2216,6 +2234,16 @@ function renderRelatedLinks(containerId, relatedLinks){
 }
 
 function openItemDetail(item){
+  state.itemDetailStack.push(item);
+  renderItemDetail(item);
+  pushView('item-detail', {sub:true, title:'Оформление'});
+}
+
+// Отрисовывает карточку товара в DOM для переданного item, без навигации
+// (не трогает navStack/itemDetailStack) — используется как при первом
+// открытии карточки, так и при восстановлении предыдущей карточки кнопкой
+// "назад" (см. goBack), чтобы не терять данные исходного товара.
+function renderItemDetail(item){
   state.currentListItem = item;
   state.itemQty = 1;
   state.itemVariantSelected = null;
@@ -2265,7 +2293,6 @@ function openItemDetail(item){
 
   setupConsent('item', item.title, !!item.description, updateItemSummary, item.consentText);
   updateItemSummary();
-  pushView('item-detail', {sub:true, title:'Оформление'});
 }
 
 function selectItemVariant(i, el){
@@ -2623,6 +2650,7 @@ async function confirmPurchase(){
 
     document.getElementById('successReceipt').innerHTML = receiptHTML(p, id, true);
     state.navStack = ['catalog','success'];
+    state.itemDetailStack = [];
     showView('success', {sub:true, title:'Готово'});
     renderReviewBanner();
 
