@@ -1355,15 +1355,17 @@ let CATALOG_ITEMS = [];
 //                          для type='list-item' — номиналы/варианты товара (label, price)
 //   sort_order    int     — порядок сортировки
 //   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
-//   username_format text   — включает проверку формата поля получателя перед
-//                          покупкой. Значения: 'none' (или NULL/пусто) — без
-//                          проверки, любой текст; 'telegram' — Telegram-юзернейм
-//                          (@ + латиница/цифры/_, 5-32 символа); 'digits' —
-//                          только цифры; 'ru' — только русские буквы;
-//                          'en' — только латинские буквы; 'url' — только
-//                          ссылка (http:// или https://). Работает для любого
-//                          товара с полем получателя (field_label заполнен),
-//                          любого type.
+//   username_format text[] — включает проверку формата поля получателя перед
+//                          покупкой. Массив из значений: 'telegram' —
+//                          Telegram-юзернейм (@ + латиница/цифры/_, 5-32 символа);
+//                          'digits' — только цифры; 'ru' — только русские буквы;
+//                          'en' — только латинские буквы; 'url' — только ссылка
+//                          (http:// или https://). Можно указать несколько сразу,
+//                          например '{digits,en}' — тогда подходит любое значение,
+//                          соответствующее хотя бы одному из форматов (условие "ИЛИ").
+//                          Пустой массив '{}' или NULL — без проверки, любой текст.
+//                          Работает для любого товара с полем получателя
+//                          (field_label заполнен), любого type.
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1535,11 +1537,21 @@ function catalogItemPriceLabel(entry){
 /* ---------------- HELPERS ---------------- */
 const rub = n => n.toLocaleString('ru-RU') + ' ₽';
 
-// Список допустимых значений колонки username_format в таблице products.
-// Любое другое/пустое/NULL значение трактуется как 'none' (без проверки).
-const USERNAME_FORMATS = ['none', 'telegram', 'digits', 'ru', 'en', 'url'];
+// Список допустимых значений колонки username_format (text[]) в таблице
+// products. Любые прочие/неизвестные значения из массива отбрасываются.
+const USERNAME_FORMATS = ['telegram', 'digits', 'ru', 'en', 'url'];
+const USERNAME_FORMAT_LABELS = {
+  telegram: 'Telegram-юзернейм (@username)',
+  digits: 'только цифры',
+  ru: 'только русские буквы',
+  en: 'только латинские буквы',
+  url: 'ссылка (http:// или https://)'
+};
+// Приводит значение колонки (ожидается массив, но подстрахуемся от строки/NULL)
+// к чистому массиву известных форматов. Пустой массив = без проверки.
 function normalizeUsernameFormat(v){
-  return USERNAME_FORMATS.includes(v) ? v : 'none';
+  const arr = Array.isArray(v) ? v : (v ? [v] : []);
+  return arr.filter(f => USERNAME_FORMATS.includes(f));
 }
 
 // Проверка юзернейма по правилам Telegram: начинается с @, дальше только
@@ -1555,40 +1567,41 @@ function checkTelegramUsername(raw){
   return { ok:true };
 }
 
-// Универсальная проверка поля получателя по выбранному в товаре формату
-// (колонка username_format). format='none' пропускает любой текст.
-function checkRecipientFormat(raw, format){
+// Проверка одного конкретного формата (без учёта того, что их может быть
+// несколько на товаре — эту логику см. в checkRecipientFormat ниже).
+function checkSingleFormat(raw, format){
   switch(format){
     case 'telegram':
       return checkTelegramUsername(raw);
     case 'digits':
-      if(!/^[0-9]+$/.test(raw)){
-        return { ok:false, msg:'Поле должно содержать только цифры' };
-      }
-      return { ok:true };
+      return /^[0-9]+$/.test(raw) ? { ok:true } : { ok:false };
     case 'ru':
-      if(!/^[А-Яа-яЁё\s-]+$/.test(raw)){
-        return { ok:false, msg:'Поле должно содержать только русские буквы' };
-      }
-      return { ok:true };
+      return /^[А-Яа-яЁё\s-]+$/.test(raw) ? { ok:true } : { ok:false };
     case 'en':
-      if(!/^[A-Za-z\s-]+$/.test(raw)){
-        return { ok:false, msg:'Поле должно содержать только латинские буквы' };
-      }
-      return { ok:true };
+      return /^[A-Za-z\s-]+$/.test(raw) ? { ok:true } : { ok:false };
     case 'url':
       try {
         const u = new URL(raw);
-        if(u.protocol !== 'http:' && u.protocol !== 'https:'){
-          return { ok:false, msg:'Укажите ссылку, начинающуюся с http:// или https://' };
-        }
+        return (u.protocol === 'http:' || u.protocol === 'https:') ? { ok:true } : { ok:false };
       } catch(e){
-        return { ok:false, msg:'Укажите корректную ссылку, например https://example.com' };
+        return { ok:false };
       }
-      return { ok:true };
     default:
       return { ok:true };
   }
+}
+
+// Универсальная проверка поля получателя по формату(ам), выбранным в товаре
+// (колонка username_format, массив). Пустой массив/undefined — без проверки.
+// Если форматов несколько — достаточно совпадения хотя бы с одним из них
+// (условие "ИЛИ"), например {digits,en} пропустит и "12345", и "JohnDoe".
+function checkRecipientFormat(raw, formats){
+  if(!formats || !formats.length) return { ok:true };
+  for(const f of formats){
+    if(checkSingleFormat(raw, f).ok) return { ok:true };
+  }
+  const labels = formats.map(f => USERNAME_FORMAT_LABELS[f] || f).join(' или ');
+  return { ok:false, msg:'Поле не подходит ни под один разрешённый формат: ' + labels };
 }
 function fmtDate(){
   const d = new Date();
@@ -2147,7 +2160,7 @@ function attemptBuy(type){
     if(cfg.needsField){
       username = document.getElementById('rateUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
-      if(cfg.usernameFormat !== 'none'){
+      {
         const check = checkRecipientFormat(username, cfg.usernameFormat);
         if(!check.ok){ showToast(check.msg); return; }
       }
@@ -2170,7 +2183,7 @@ function attemptBuy(type){
     if(moreItemCfg.needsField){
       username = document.getElementById('premiumUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
-      if(moreItemCfg.usernameFormat !== 'none'){
+      {
         const check = checkRecipientFormat(username, moreItemCfg.usernameFormat);
         if(!check.ok){ showToast(check.msg); return; }
       }
@@ -2190,7 +2203,7 @@ function attemptBuy(type){
     if(item.needsField){
       username = document.getElementById('itemUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
-      if(item.usernameFormat !== 'none'){
+      {
         const check = checkRecipientFormat(username, item.usernameFormat);
         if(!check.ok){ showToast(check.msg); return; }
       }
