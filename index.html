@@ -704,9 +704,9 @@
       </div>
       <div class="filter-row">
         <div class="filter-pill active" data-f="all">Все</div>
-        <div class="filter-pill" data-f="stars">Stars / Premium</div>
-        <div class="filter-pill" data-f="robux">Robux</div>
-        <div class="filter-pill" data-f="other">Ключи / карты</div>
+        <div class="filter-pill" data-f="services">Сервисы</div>
+        <div class="filter-pill" data-f="game">Игровые</div>
+        <div class="filter-pill" data-f="key">Ключи и карты</div>
       </div>
       <div id="ordersList"></div>
     </section>
@@ -1991,6 +1991,11 @@ function updateItemSummary(){
 }
 
 /* ---------------- BUY FLOW ---------------- */
+// Сопоставление id товара типа 'rate' (например, товары Stars/Robux в Supabase)
+// с новой схемой категорий заказов: 'services' | 'game' | 'key'.
+// Если в Supabase появятся новые id товаров этого типа — добавьте их сюда.
+const RATE_ORDER_CAT = { stars: 'services', robux: 'game' };
+
 function attemptBuy(type){
   let purchase;
   if(type === 'rate'){
@@ -2008,7 +2013,7 @@ function attemptBuy(type){
     }
     const total = Math.round(state.rateSelected * cfg.rate);
     purchase = {
-      cat: state.currentCategory, glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
+      cat: (RATE_ORDER_CAT[state.currentCategory] || 'game'), glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
       recipient: username, price: total,
       // price выше — только для локального отображения чека до ответа сервера;
@@ -2026,7 +2031,7 @@ function attemptBuy(type){
     }
     const plan = PREMIUM_PLANS[state.premiumSelected];
     purchase = {
-      cat:'stars', glyph:'💎', title:'Telegram Premium · ' + plan.label,
+      cat:'services', glyph:'💎', title:'Telegram Premium · ' + plan.label,
       recipient: username, price: plan.price,
       product_id: PREMIUM_PRODUCT_ID,
       plan_index: state.premiumSelected
@@ -2040,7 +2045,7 @@ function attemptBuy(type){
       if(!username){ showToast('Укажите получателя'); return; }
     }
     purchase = {
-      cat:'other', glyph:item.glyph,
+      cat:'key', glyph:item.glyph,
       title: item.title + (state.itemQty>1 ? ' × '+state.itemQty : ''),
       recipient: username, price: item.price * state.itemQty,
       product_id: item.id,
