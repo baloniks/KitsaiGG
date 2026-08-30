@@ -1355,6 +1355,14 @@ let CATALOG_ITEMS = [];
 //                          для type='list-item' — номиналы/варианты товара (label, price)
 //   sort_order    int     — порядок сортировки
 //   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
+//   username_format text   — включает проверку формата поля получателя перед
+//                          покупкой. Значения: 'none' (или NULL/пусто) — без
+//                          проверки, любой текст; 'telegram' — Telegram-юзернейм
+//                          (@ + латиница/цифры/_, 5-32 символа); 'digits' —
+//                          только цифры; 'ru' — только русские буквы;
+//                          'en' — только латинские буквы. Работает для любого
+//                          товара с полем получателя (field_label заполнен),
+//                          любого type.
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1383,7 +1391,8 @@ function buildProductConfigs(rows){
         qtyLabel: row.qty_label || 'Количество',
         minQty: row.min_qty != null ? Number(row.min_qty) : null,
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
-        inputMode: row.input_mode === 'input' ? 'input' : 'chips'
+        inputMode: row.input_mode === 'input' ? 'input' : 'chips',
+        usernameFormat: normalizeUsernameFormat(row.username_format)
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1412,7 +1421,8 @@ function buildProductConfigs(rows){
         // без пароля/кода). Задаётся через колонку hint — для type='more-item'
         // она больше ничем не используется. Оставьте пустой строкой в таблице,
         // чтобы подсказка вообще не показывалась.
-        hint: row.hint != null ? row.hint : 'Активация без пароля и без кода подтверждения.'
+        hint: row.hint != null ? row.hint : 'Активация без пароля и без кода подтверждения.',
+        usernameFormat: normalizeUsernameFormat(row.username_format)
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1434,7 +1444,8 @@ function buildProductConfigs(rows){
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
         consentText: row.consent_text || '',
-        maxQty: row.max_qty != null ? Number(row.max_qty) : null
+        maxQty: row.max_qty != null ? Number(row.max_qty) : null,
+        usernameFormat: normalizeUsernameFormat(row.username_format)
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1523,6 +1534,13 @@ function catalogItemPriceLabel(entry){
 /* ---------------- HELPERS ---------------- */
 const rub = n => n.toLocaleString('ru-RU') + ' ₽';
 
+// Список допустимых значений колонки username_format в таблице products.
+// Любое другое/пустое/NULL значение трактуется как 'none' (без проверки).
+const USERNAME_FORMATS = ['none', 'telegram', 'digits', 'ru', 'en'];
+function normalizeUsernameFormat(v){
+  return USERNAME_FORMATS.includes(v) ? v : 'none';
+}
+
 // Проверка юзернейма по правилам Telegram: начинается с @, дальше только
 // латиница/цифры/подчёркивание, первый символ после @ — буква, длина 5-32.
 function checkTelegramUsername(raw){
@@ -1534,6 +1552,32 @@ function checkTelegramUsername(raw){
     return { ok:false, msg:'Юзернейм — латиницей, 5–32 символа (буквы/цифры/_), первый символ буква' };
   }
   return { ok:true };
+}
+
+// Универсальная проверка поля получателя по выбранному в товаре формату
+// (колонка username_format). format='none' пропускает любой текст.
+function checkRecipientFormat(raw, format){
+  switch(format){
+    case 'telegram':
+      return checkTelegramUsername(raw);
+    case 'digits':
+      if(!/^[0-9]+$/.test(raw)){
+        return { ok:false, msg:'Поле должно содержать только цифры' };
+      }
+      return { ok:true };
+    case 'ru':
+      if(!/^[А-Яа-яЁё\s-]+$/.test(raw)){
+        return { ok:false, msg:'Поле должно содержать только русские буквы' };
+      }
+      return { ok:true };
+    case 'en':
+      if(!/^[A-Za-z\s-]+$/.test(raw)){
+        return { ok:false, msg:'Поле должно содержать только латинские буквы' };
+      }
+      return { ok:true };
+    default:
+      return { ok:true };
+  }
 }
 function fmtDate(){
   const d = new Date();
@@ -2092,8 +2136,8 @@ function attemptBuy(type){
     if(cfg.needsField){
       username = document.getElementById('rateUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
-      if(state.currentCategory === 'stars'){
-        const check = checkTelegramUsername(username);
+      if(cfg.usernameFormat !== 'none'){
+        const check = checkRecipientFormat(username, cfg.usernameFormat);
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
@@ -2115,6 +2159,10 @@ function attemptBuy(type){
     if(moreItemCfg.needsField){
       username = document.getElementById('premiumUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
+      if(moreItemCfg.usernameFormat !== 'none'){
+        const check = checkRecipientFormat(username, moreItemCfg.usernameFormat);
+        if(!check.ok){ showToast(check.msg); return; }
+      }
     }
     const plan = moreItemCfg.plans[state.premiumSelected];
     purchase = {
@@ -2131,6 +2179,10 @@ function attemptBuy(type){
     if(item.needsField){
       username = document.getElementById('itemUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
+      if(item.usernameFormat !== 'none'){
+        const check = checkRecipientFormat(username, item.usernameFormat);
+        if(!check.ok){ showToast(check.msg); return; }
+      }
     }
     const variant = item.variants ? item.variants[state.itemVariantSelected] : null;
     const unitPrice = variant ? Number(variant.price) || 0 : item.price;
