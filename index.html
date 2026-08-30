@@ -508,8 +508,11 @@
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--surface-3); border:1px solid var(--border); color:var(--text);
-    padding:11px 18px; border-radius:999px; font-size:12.5px; font-weight:500;
-    opacity:0; pointer-events:none; transition:all .25s ease; z-index:50; white-space:nowrap;
+    padding:11px 18px; border-radius:16px; font-size:12.5px; font-weight:500;
+    opacity:0; pointer-events:none; transition:all .25s ease; z-index:50;
+    white-space:normal; text-align:center; line-height:1.4;
+    max-width:min(320px, calc(100vw - 32px)); box-sizing:border-box;
+    overflow-wrap:break-word; word-break:break-word;
     box-shadow:0 10px 30px rgba(0,0,0,.4);
   }
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
@@ -1366,6 +1369,12 @@ let CATALOG_ITEMS = [];
 //                          Пустой массив '{}' или NULL — без проверки, любой текст.
 //                          Работает для любого товара с полем получателя
 //                          (field_label заполнен), любого type.
+//   select_prompt text    — текст на кнопке покупки ДО того, как выбрана сумма/
+//                          срок/вариант. По умолчанию: 'Выберите сумму' для
+//                          type='rate', 'Выберите срок' для type='more-item',
+//                          'Выберите вариант' для type='list-item' с вариантами.
+//                          Задайте свой текст, если нужна другая формулировка
+//                          (например, 'Выберите пакет', 'Укажите номинал').
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1395,6 +1404,7 @@ function buildProductConfigs(rows){
         minQty: row.min_qty != null ? Number(row.min_qty) : null,
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
         inputMode: row.input_mode === 'input' ? 'input' : 'chips',
+        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите сумму',
         usernameFormat: normalizeUsernameFormat(row.username_format)
       };
       CATALOG_ITEMS.push({
@@ -1425,7 +1435,8 @@ function buildProductConfigs(rows){
         // она больше ничем не используется. Оставьте пустой строкой в таблице,
         // чтобы подсказка вообще не показывалась.
         hint: row.hint != null ? row.hint : 'Активация без пароля и без кода подтверждения.',
-        usernameFormat: normalizeUsernameFormat(row.username_format)
+        usernameFormat: normalizeUsernameFormat(row.username_format),
+        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите срок'
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1448,7 +1459,8 @@ function buildProductConfigs(rows){
         description: row.description || '',
         consentText: row.consent_text || '',
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
-        usernameFormat: normalizeUsernameFormat(row.username_format)
+        usernameFormat: normalizeUsernameFormat(row.username_format),
+        selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите вариант'
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1601,7 +1613,7 @@ function checkRecipientFormat(raw, formats){
     if(checkSingleFormat(raw, f).ok) return { ok:true };
   }
   const labels = formats.map(f => USERNAME_FORMAT_LABELS[f] || f).join(' или ');
-  return { ok:false, msg:'Поле не подходит ни под один разрешённый формат: ' + labels };
+  return { ok:false, msg:'Разрешённый формат текста: (' + labels + ')' };
 }
 function fmtDate(){
   const d = new Date();
@@ -1854,7 +1866,7 @@ function updateRateSummary(){
   if(state.rateSelected == null){
     document.getElementById('rateQtyVal').textContent = '—';
     document.getElementById('rateTotalVal').textContent = '— ₽';
-    btn.textContent = 'Выберите сумму';
+    btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
   }
@@ -1904,14 +1916,14 @@ function selectPremium(i, el){
 
 function updatePremiumSummary(){
   const btn = document.getElementById('premiumBuyBtn');
+  const cfg = MORE_ITEM_CONFIG[state.currentCategory];
   if(state.premiumSelected == null){
     document.getElementById('premiumPlanVal').textContent = '—';
     document.getElementById('premiumTotalVal').textContent = '— ₽';
-    btn.textContent = 'Выберите срок';
+    btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
   }
-  const cfg = MORE_ITEM_CONFIG[state.currentCategory];
   const plan = cfg.plans[state.premiumSelected];
   document.getElementById('premiumPlanVal').textContent = plan.label;
   document.getElementById('premiumTotalVal').textContent = rub(plan.price);
@@ -2129,7 +2141,7 @@ function updateItemSummary(){
   const variantOk = !hasVariants || selectedVariant != null;
   const consentOk = document.getElementById('itemConsent').checked;
   if(!variantOk){
-    buyBtn.textContent = 'Выберите вариант';
+    buyBtn.textContent = item.selectPrompt;
     buyBtn.classList.add('disabled');
   } else if(consentOk){
     buyBtn.textContent = 'Купить';
@@ -2854,7 +2866,10 @@ function showToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  // Длинные сообщения (например, про разрешённый формат поля) держим на экране
+  // дольше, чтобы их успели дочитать — от 2.2с до 5с в зависимости от длины.
+  const duration = Math.min(5000, Math.max(2200, msg.length * 55));
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
 }
 
 /* ---------------- EVENT LISTENERS ATTACHMENT ---------------- */
