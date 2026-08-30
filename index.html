@@ -1360,7 +1360,8 @@ let CATALOG_ITEMS = [];
 //                          проверки, любой текст; 'telegram' — Telegram-юзернейм
 //                          (@ + латиница/цифры/_, 5-32 символа); 'digits' —
 //                          только цифры; 'ru' — только русские буквы;
-//                          'en' — только латинские буквы. Работает для любого
+//                          'en' — только латинские буквы; 'url' — только
+//                          ссылка (http:// или https://). Работает для любого
 //                          товара с полем получателя (field_label заполнен),
 //                          любого type.
 function buildProductConfigs(rows){
@@ -1536,7 +1537,7 @@ const rub = n => n.toLocaleString('ru-RU') + ' ₽';
 
 // Список допустимых значений колонки username_format в таблице products.
 // Любое другое/пустое/NULL значение трактуется как 'none' (без проверки).
-const USERNAME_FORMATS = ['none', 'telegram', 'digits', 'ru', 'en'];
+const USERNAME_FORMATS = ['none', 'telegram', 'digits', 'ru', 'en', 'url'];
 function normalizeUsernameFormat(v){
   return USERNAME_FORMATS.includes(v) ? v : 'none';
 }
@@ -1573,6 +1574,16 @@ function checkRecipientFormat(raw, format){
     case 'en':
       if(!/^[A-Za-z\s-]+$/.test(raw)){
         return { ok:false, msg:'Поле должно содержать только латинские буквы' };
+      }
+      return { ok:true };
+    case 'url':
+      try {
+        const u = new URL(raw);
+        if(u.protocol !== 'http:' && u.protocol !== 'https:'){
+          return { ok:false, msg:'Укажите ссылку, начинающуюся с http:// или https://' };
+        }
+      } catch(e){
+        return { ok:false, msg:'Укажите корректную ссылку, например https://example.com' };
       }
       return { ok:true };
     default:
