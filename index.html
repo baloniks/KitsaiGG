@@ -1175,17 +1175,12 @@ const state = {
 
 /* ---------------- PRODUCT CONFIG (загружается из таблицы products в Supabase) ---------------- */
 // Эти переменные раньше были захардкожены, теперь их заполняет loadProducts()
-// на основе строк из таблицы products. Структура (RATE_CONFIG/PREMIUM_PLANS/
-// LIST_CONFIG) сохранена специально — весь остальной код покупки (чипы,
-// чек, оформление) продолжает работать без изменений.
+// на основе строк из таблицы products.
 let RATE_CONFIG = {};
-let PREMIUM_PLANS = [];
-let PREMIUM_PRODUCT_ID = null; // id строки type='more-item' из products — нужен для create-order
-let PREMIUM_FIELD_LABEL = '';
-let PREMIUM_FIELD_PLACEHOLDER = '';
-let PREMIUM_NEEDS_FIELD = false;
-let PREMIUM_DESCRIPTION = '';
-let PREMIUM_CONSENT_TEXT = '';
+// MORE_ITEM_CONFIG — словарь по id товара (как RATE_CONFIG), а не одиночные
+// переменные, потому что товаров типа 'more-item' может быть несколько
+// (например Telegram Premium и Steam Gift Card одновременно).
+let MORE_ITEM_CONFIG = {};
 let LIST_CONFIG = {};
 
 // Человеко-читаемые заголовки для групп list-item товаров (используются как
@@ -1331,7 +1326,7 @@ const CATALOG_SUBCATEGORIES = {
 // type:'list-item' → открывает карточку конкретного товара; listKey/itemId указывают на LIST_CONFIG
 let CATALOG_ITEMS = [];
 
-// Строка из таблицы products → внутренние структуры RATE_CONFIG/PREMIUM_PLANS/
+// Строка из таблицы products → внутренние структуры RATE_CONFIG/MORE_ITEM_CONFIG/
 // LIST_CONFIG/CATALOG_ITEMS, которые использует остальной код приложения.
 // Ожидаемые колонки таблицы products (все, кроме id/type/title/category, могут
 // быть NULL — используются только для своего типа товара):
@@ -1357,13 +1352,7 @@ let CATALOG_ITEMS = [];
 //   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
-  PREMIUM_PLANS = [];
-  PREMIUM_PRODUCT_ID = null;
-  PREMIUM_FIELD_LABEL = '';
-  PREMIUM_FIELD_PLACEHOLDER = '';
-  PREMIUM_NEEDS_FIELD = false;
-  PREMIUM_DESCRIPTION = '';
-  PREMIUM_CONSENT_TEXT = '';
+  MORE_ITEM_CONFIG = {};
   LIST_CONFIG = {};
   CATALOG_ITEMS = [];
 
@@ -1398,17 +1387,22 @@ function buildProductConfigs(rows){
       });
 
     } else if(row.type === 'more-item'){
-      PREMIUM_PRODUCT_ID = row.id;
-      PREMIUM_PLANS = Array.isArray(row.variants) ? row.variants : [];
-      PREMIUM_FIELD_LABEL = row.field_label || '';
-      PREMIUM_FIELD_PLACEHOLDER = row.field_placeholder || '';
-      PREMIUM_NEEDS_FIELD = !!(row.field_label && String(row.field_label).trim());
-      PREMIUM_DESCRIPTION = row.description || '';
-      PREMIUM_CONSENT_TEXT = row.consent_text || '';
+      // Словарь по id — так несколько товаров этого типа (Premium, Steam Gift Card
+      // и т.п.) не перетирают данные друг друга.
+      MORE_ITEM_CONFIG[row.id] = {
+        title: row.title,
+        glyph: row.glyph || '',
+        plans: Array.isArray(row.variants) ? row.variants : [],
+        fieldLabel: row.field_label || '',
+        fieldPlaceholder: row.field_placeholder || '',
+        needsField: !!(row.field_label && String(row.field_label).trim()),
+        description: row.description || '',
+        consentText: row.consent_text || ''
+      };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'more-item'
+        type: 'more-item', key: row.id
       });
 
     } else if(row.type === 'list-item'){
@@ -1483,7 +1477,8 @@ function catalogItemPrice(entry){
     return Math.round(baseQty * cfg.rate);
   }
   if(entry.type === 'more-item'){
-    return PREMIUM_PLANS.length ? Math.min(...PREMIUM_PLANS.map(p => Number(p.price) || 0)) : 0;
+    const cfg = MORE_ITEM_CONFIG[entry.key];
+    return cfg && cfg.plans.length ? Math.min(...cfg.plans.map(p => Number(p.price) || 0)) : 0;
   }
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
@@ -1632,7 +1627,7 @@ function goBack(){
 function viewTitle(v){
   const map = {
     'rate-product': RATE_CONFIG[state.currentCategory]?.title || '',
-    'premium-product': 'Telegram Premium',
+    'premium-product': MORE_ITEM_CONFIG[state.currentCategory]?.title || '',
     'list-product': LIST_CONFIG[state.currentCategory]?.title || '',
     'item-detail': state.currentListItem?.title || '',
     'checkout': 'Подтверждение заказа',
@@ -1648,9 +1643,9 @@ function openCategory(cat){
   if(RATE_CONFIG[cat]){
     renderRateProduct(cat);
     pushView('rate-product', {sub:true, title:RATE_CONFIG[cat].title});
-  } else if(cat === 'premium'){
-    renderPremiumProduct();
-    pushView('premium-product', {sub:true, title:'Telegram Premium'});
+  } else if(MORE_ITEM_CONFIG[cat]){
+    renderPremiumProduct(cat);
+    pushView('premium-product', {sub:true, title: MORE_ITEM_CONFIG[cat].title});
   } else if(LIST_CONFIG[cat]){
     renderListProduct(cat);
     pushView('list-product', {sub:true, title:LIST_CONFIG[cat].title});
@@ -1791,19 +1786,21 @@ function updateRateSummary(){
   }
 }
 
-function renderPremiumProduct(){
+function renderPremiumProduct(id){
+  state.currentCategory = id;
   state.premiumSelected = null;
-  document.getElementById('premiumFieldWrap').style.display = PREMIUM_NEEDS_FIELD ? '' : 'none';
-  document.getElementById('premiumFieldLabel').textContent = PREMIUM_FIELD_LABEL;
-  document.getElementById('premiumUsername').placeholder = PREMIUM_FIELD_PLACEHOLDER || '@username';
+  const cfg = MORE_ITEM_CONFIG[id];
+  document.getElementById('premiumFieldWrap').style.display = cfg.needsField ? '' : 'none';
+  document.getElementById('premiumFieldLabel').textContent = cfg.fieldLabel;
+  document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('premiumUsername').value = '';
   const premiumDesc = document.getElementById('premiumDescription');
-  premiumDesc.textContent = PREMIUM_DESCRIPTION;
-  premiumDesc.style.display = PREMIUM_DESCRIPTION ? '' : 'none';
-  setupConsent('premium', 'Telegram Premium', !!PREMIUM_DESCRIPTION, updatePremiumSummary, PREMIUM_CONSENT_TEXT);
+  premiumDesc.textContent = cfg.description;
+  premiumDesc.style.display = cfg.description ? '' : 'none';
+  setupConsent('premium', cfg.title, !!cfg.description, updatePremiumSummary, cfg.consentText);
   const grid = document.getElementById('premiumChips');
   grid.innerHTML = '';
-  PREMIUM_PLANS.forEach((p, i) => {
+  cfg.plans.forEach((p, i) => {
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${p.label}</div><div class="sub">${rub(p.price)}</div>`;
@@ -1829,7 +1826,8 @@ function updatePremiumSummary(){
     btn.classList.add('disabled');
     return;
   }
-  const plan = PREMIUM_PLANS[state.premiumSelected];
+  const cfg = MORE_ITEM_CONFIG[state.currentCategory];
+  const plan = cfg.plans[state.premiumSelected];
   document.getElementById('premiumPlanVal').textContent = plan.label;
   document.getElementById('premiumTotalVal').textContent = rub(plan.price);
   btn.textContent = 'Купить за ' + rub(plan.price);
@@ -1943,7 +1941,7 @@ function openCatalogItem(entry){
   if(entry.type === 'rate'){
     openCategory(entry.key);
   } else if(entry.type === 'more-item'){
-    openCategory('premium');
+    openCategory(entry.key);
   } else if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
     if(item) openItemDetail(item);
@@ -2062,6 +2060,10 @@ function updateItemSummary(){
 // с новой схемой категорий заказов: 'services' | 'game' | 'key'.
 // Если в Supabase появятся новые id товаров этого типа — добавьте их сюда.
 const RATE_ORDER_CAT = { stars: 'services', robux: 'game' };
+// Аналогично — категория для локального отображения заказа сразу после покупки,
+// до того как список подтянется с сервера. Держим в синхроне с
+// MORE_ITEM_ORDER_CATEGORY в supabase/functions/create-order/index.ts.
+const MORE_ITEM_ORDER_CAT = { premium: 'services', 'giftcard-steam': 'key' };
 
 function attemptBuy(type){
   let purchase;
@@ -2091,16 +2093,17 @@ function attemptBuy(type){
   } else if(type === 'premium'){
     if(state.premiumSelected == null) return;
     if(!document.getElementById('premiumConsent').checked){ showToast('Отметьте согласие с условиями покупки'); return; }
+    const moreItemCfg = MORE_ITEM_CONFIG[state.currentCategory];
     let username = null;
-    if(PREMIUM_NEEDS_FIELD){
+    if(moreItemCfg.needsField){
       username = document.getElementById('premiumUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
     }
-    const plan = PREMIUM_PLANS[state.premiumSelected];
+    const plan = moreItemCfg.plans[state.premiumSelected];
     purchase = {
-      cat:'services', glyph:'💎', title:'Telegram Premium · ' + plan.label,
+      cat: (MORE_ITEM_ORDER_CAT[state.currentCategory] || 'services'), glyph: moreItemCfg.glyph || '💎', title: moreItemCfg.title + ' · ' + plan.label,
       recipient: username, price: plan.price,
-      product_id: PREMIUM_PRODUCT_ID,
+      product_id: state.currentCategory,
       plan_index: state.premiumSelected
     };
   } else if(type === 'item'){
