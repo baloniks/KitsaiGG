@@ -644,7 +644,7 @@
         <input type="text" id="itemUsername" placeholder="@username или ник в игре">
       </div>
       <div class="chip-grid" id="itemVariants" style="display:none; grid-template-columns:1fr 1fr 1fr; margin-top:12px;"></div>
-      <div class="stepper-row">
+      <div class="stepper-row" id="itemQtyWrap">
         <span style="font-size:13px; color:var(--text-muted);">Количество</span>
         <div class="stepper">
           <button id="btnQtyMinus">−</button>
@@ -1483,17 +1483,31 @@ function catalogItemPrice(entry){
     return Math.round(baseQty * cfg.rate);
   }
   if(entry.type === 'premium'){
-    return PREMIUM_PLANS.length ? Math.min(...PREMIUM_PLANS.map(p => p.price)) : 0;
+    return PREMIUM_PLANS.length ? Math.min(...PREMIUM_PLANS.map(p => Number(p.price) || 0)) : 0;
   }
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
-    return item ? item.price : 0;
+    if(!item) return 0;
+    // Если у товара несколько номиналов (variants), собственного price у него
+    // может не быть (price=null в базе) — тогда берём минимальную цену из вариантов.
+    if(item.variants && item.variants.length){
+      return Math.min(...item.variants.map(v => Number(v.price) || 0));
+    }
+    return item.price;
   }
   return 0;
 }
+function catalogItemHasRange(entry){
+  if(entry.type === 'rate' || entry.type === 'premium') return true;
+  if(entry.type === 'list-item'){
+    const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
+    return !!(item && item.variants && item.variants.length);
+  }
+  return false;
+}
 function catalogItemPriceLabel(entry){
   const price = catalogItemPrice(entry);
-  return (entry.type === 'rate' || entry.type === 'premium') ? 'от ' + rub(price) : rub(price);
+  return catalogItemHasRange(entry) ? 'от ' + rub(price) : rub(price);
 }
 
 /* ---------------- HELPERS ---------------- */
@@ -1986,6 +2000,14 @@ function openItemDetail(item){
     variantGrid.style.display = 'none';
   }
 
+  // Строку "Количество" показываем только если у товара явно задан max_qty (>1) —
+  // то есть админ сам включает возможность купить несколько штук, просто заполнив
+  // max_qty у нужного товара в Supabase. Если max_qty пустой — количество скрыто
+  // и жёстко равно 1.
+  const qtyWrap = document.getElementById('itemQtyWrap');
+  const hasQty = item.maxQty != null && item.maxQty > 1;
+  if(qtyWrap) qtyWrap.style.display = hasQty ? '' : 'none';
+
   setupConsent('item', item.title, !!item.description, updateItemSummary, item.consentText);
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
@@ -1999,14 +2021,15 @@ function selectItemVariant(i, el){
 }
 
 function changeItemQty(d){
-  const max = state.currentListItem?.maxQty || 20;
+  const item = state.currentListItem;
+  const max = (item?.maxQty != null && item.maxQty > 1) ? item.maxQty : 1;
   state.itemQty = Math.max(1, Math.min(max, state.itemQty + d));
   updateItemSummary();
 }
 
 function updateItemSummary(){
   const item = state.currentListItem;
-  const max = item?.maxQty || 20;
+  const max = (item?.maxQty != null && item.maxQty > 1) ? item.maxQty : 1;
   const hasVariants = !!item.variants;
   const selectedVariant = hasVariants && state.itemVariantSelected != null
     ? item.variants[state.itemVariantSelected]
