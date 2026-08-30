@@ -206,14 +206,15 @@
   }
 
   .product-description{
-    margin-top:14px; margin-bottom:2px; padding:12px 13px;
+    margin-top:0; margin-bottom:0; padding:12px 13px;
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm);
     font-size:12.5px; color:var(--text-muted); line-height:1.55; white-space:pre-line;
     overflow-wrap:break-word; word-break:break-word;
   }
+  .product-description-block{margin-top:18px; margin-bottom:2px;}
   .product-description-label{
     font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text-faint);
-    font-family:var(--font-mono); margin-bottom:8px; white-space:normal;
+    font-family:var(--font-mono); margin-bottom:8px; margin-left:2px; white-space:normal;
   }
 
   .consent-row{
@@ -615,9 +616,9 @@
         <span id="rateConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
-      <div class="product-description" id="rateDescription2" style="display:none;">
+      <div class="product-description-block" id="rateDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
-        <div id="rateDescription2Text"></div>
+        <div class="product-description" id="rateDescription2Text"></div>
       </div>
     </section>
 
@@ -643,9 +644,9 @@
         <span id="premiumConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
-      <div class="product-description" id="premiumDescription2" style="display:none;">
+      <div class="product-description-block" id="premiumDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
-        <div id="premiumDescription2Text"></div>
+        <div class="product-description" id="premiumDescription2Text"></div>
       </div>
     </section>
 
@@ -690,9 +691,9 @@
         <span id="itemConsentText"></span>
       </label>
       <button class="btn-primary" id="btnItemBuy">Купить</button>
-      <div class="product-description" id="itemDescription2" style="display:none;">
+      <div class="product-description-block" id="itemDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
-        <div id="itemDescription2Text"></div>
+        <div class="product-description" id="itemDescription2Text"></div>
       </div>
     </section>
 
