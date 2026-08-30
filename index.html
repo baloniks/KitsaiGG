@@ -643,6 +643,7 @@
         <label id="itemFieldLabel">Куда доставить</label>
         <input type="text" id="itemUsername" placeholder="@username или ник в игре">
       </div>
+      <div class="chip-grid" id="itemVariants" style="display:none; grid-template-columns:1fr 1fr 1fr; margin-top:12px;"></div>
       <div class="stepper-row">
         <span style="font-size:13px; color:var(--text-muted);">Количество</span>
         <div class="stepper">
@@ -1166,6 +1167,7 @@ const state = {
   premiumSelected: null,
   currentListItem: null,
   itemQty: 1,
+  itemVariantSelected: null,
   topupAmount: null,
   pendingPurchase: null,
   navStack: ['catalog']
@@ -1416,6 +1418,7 @@ function buildProductConfigs(rows){
       LIST_CONFIG[groupKey].items.push({
         id: row.id, glyph: row.glyph || '', title: row.title,
         sub: row.sub || '', price: Number(row.price) || 0,
+        variants: Array.isArray(row.variants) && row.variants.length ? row.variants : null,
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
@@ -1953,6 +1956,7 @@ function renderListProduct(cat){
 function openItemDetail(item){
   state.currentListItem = item;
   state.itemQty = 1;
+  state.itemVariantSelected = null;
   document.getElementById('itemGlyph').textContent = item.glyph;
   document.getElementById('itemTitle').textContent = item.title;
   document.getElementById('itemSubtitle').textContent = item.sub;
@@ -1963,9 +1967,34 @@ function openItemDetail(item){
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.textContent = item.description;
   itemDesc.style.display = item.description ? '' : 'none';
+
+  // Товар с несколькими номиналами (variants) — рисуем чипы выбора,
+  // как у Telegram Premium; без variants блок просто скрыт.
+  const variantGrid = document.getElementById('itemVariants');
+  variantGrid.innerHTML = '';
+  if(item.variants){
+    variantGrid.style.display = '';
+    item.variants.forEach((v, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<div class="amt">${v.label}</div>`;
+      chip.addEventListener('click', () => selectItemVariant(i, chip));
+      variantGrid.appendChild(chip);
+    });
+  } else {
+    variantGrid.style.display = 'none';
+  }
+
   setupConsent('item', item.title, !!item.description, updateItemSummary, item.consentText);
   updateItemSummary();
   pushView('item-detail', {sub:true, title:'Оформление'});
+}
+
+function selectItemVariant(i, el){
+  document.querySelectorAll('#itemVariants .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.itemVariantSelected = i;
+  updateItemSummary();
 }
 
 function changeItemQty(d){
@@ -1977,15 +2006,29 @@ function changeItemQty(d){
 function updateItemSummary(){
   const item = state.currentListItem;
   const max = item?.maxQty || 20;
+  const hasVariants = !!item.variants;
+  const selectedVariant = hasVariants && state.itemVariantSelected != null
+    ? item.variants[state.itemVariantSelected]
+    : null;
+  const unitPrice = hasVariants ? (selectedVariant ? Number(selectedVariant.price) || 0 : null) : item.price;
+
   document.getElementById('itemQty').textContent = state.itemQty;
-  document.getElementById('itemUnitPrice').textContent = rub(item.price);
-  document.getElementById('itemTotalVal').textContent = rub(item.price * state.itemQty);
+  document.getElementById('itemUnitPrice').textContent = unitPrice != null ? rub(unitPrice) : '—';
+  document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— ₽';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
+
   const buyBtn = document.getElementById('btnItemBuy');
-  if(document.getElementById('itemConsent').checked){
+  const variantOk = !hasVariants || selectedVariant != null;
+  const consentOk = document.getElementById('itemConsent').checked;
+  if(!variantOk){
+    buyBtn.textContent = 'Выберите вариант';
+    buyBtn.classList.add('disabled');
+  } else if(consentOk){
+    buyBtn.textContent = 'Купить';
     buyBtn.classList.remove('disabled');
   } else {
+    buyBtn.textContent = 'Купить';
     buyBtn.classList.add('disabled');
   }
 }
@@ -2039,17 +2082,21 @@ function attemptBuy(type){
   } else if(type === 'item'){
     if(!document.getElementById('itemConsent').checked){ showToast('Отметьте согласие с условиями покупки'); return; }
     const item = state.currentListItem;
+    if(item.variants && state.itemVariantSelected == null){ showToast('Выберите вариант'); return; }
     let username = null;
     if(item.needsField){
       username = document.getElementById('itemUsername').value.trim();
       if(!username){ showToast('Укажите получателя'); return; }
     }
+    const variant = item.variants ? item.variants[state.itemVariantSelected] : null;
+    const unitPrice = variant ? Number(variant.price) || 0 : item.price;
     purchase = {
       cat:'key', glyph:item.glyph,
-      title: item.title + (state.itemQty>1 ? ' × '+state.itemQty : ''),
-      recipient: username, price: item.price * state.itemQty,
+      title: item.title + (variant ? ' · ' + variant.label : '') + (state.itemQty>1 ? ' × '+state.itemQty : ''),
+      recipient: username, price: unitPrice * state.itemQty,
       product_id: item.id,
-      qty: state.itemQty
+      qty: state.itemQty,
+      variant_index: item.variants ? state.itemVariantSelected : null
     };
   }
   state.pendingPurchase = purchase;
@@ -2214,6 +2261,7 @@ async function confirmPurchase(){
         product_id: p.product_id,
         qty: p.qty,
         plan_index: p.plan_index,
+        variant_index: p.variant_index,
         recipient: p.recipient,
         kcoin_to_use: kcoinToUse
       }
