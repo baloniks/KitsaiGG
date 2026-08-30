@@ -611,6 +611,7 @@
 
     <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
+      <div class="related-links" id="rateRelatedLinks" style="display:none;"></div>
       <div class="chip-grid" id="rateChips"></div>
       <div class="field" id="rateCustomWrap" style="display:none;">
         <label id="rateCustomLabel">Своё количество</label>
@@ -644,6 +645,7 @@
 
     <!-- ===================== PREMIUM ===================== -->
     <section class="view" data-view="premium-product">
+      <div class="related-links" id="premiumRelatedLinks" style="display:none;"></div>
       <div class="chip-grid" id="premiumChips" style="grid-template-columns:1fr 1fr;"></div>
       <div class="field" id="premiumFieldWrap">
         <label id="premiumFieldLabel">Юзернейм получателя</label>
@@ -1480,7 +1482,8 @@ function buildProductConfigs(rows){
         fieldPlaceholder2: row.field_placeholder_2 || '',
         needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
         usernameFormat2: normalizeUsernameFormat(row.username_format_2),
-        usernameFormat: normalizeUsernameFormat(row.username_format)
+        usernameFormat: normalizeUsernameFormat(row.username_format),
+        relatedLinks: parseRelatedLinks(row.related_links)
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1517,7 +1520,8 @@ function buildProductConfigs(rows){
         fieldLabel2: row.field_label_2 || '',
         fieldPlaceholder2: row.field_placeholder_2 || '',
         needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
-        usernameFormat2: normalizeUsernameFormat(row.username_format_2)
+        usernameFormat2: normalizeUsernameFormat(row.username_format_2),
+        relatedLinks: parseRelatedLinks(row.related_links)
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1554,15 +1558,7 @@ function buildProductConfigs(rows){
         // Если колонка пустая/NULL — панель просто не показывается. Ссылки на
         // товар, которого нет или который выключен (active=false), тихо
         // пропускаются при отрисовке.
-        relatedLinks: Array.isArray(row.related_links)
-          ? row.related_links
-              .filter(l => l && l.product_id)
-              .map(l => ({
-                icon: (l.icon && String(l.icon).trim()) || '🔗',
-                label: (l.label && String(l.label).trim()) || '',
-                productId: l.product_id
-              }))
-          : []
+        relatedLinks: parseRelatedLinks(row.related_links)
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1875,6 +1871,7 @@ function setupConsent(prefix, title, hasDescription, onChange, customText){
 function renderRateProduct(cat){
   const cfg = RATE_CONFIG[cat];
   state.rateSelected = null;
+  renderRelatedLinks('rateRelatedLinks', cfg.relatedLinks);
   document.getElementById('rateFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
@@ -1995,6 +1992,7 @@ function renderPremiumProduct(id){
   state.currentCategory = id;
   state.premiumSelected = null;
   const cfg = MORE_ITEM_CONFIG[id];
+  renderRelatedLinks('premiumRelatedLinks', cfg.relatedLinks);
   document.getElementById('premiumFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('premiumFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
@@ -2180,13 +2178,27 @@ function renderListProduct(cat){
   });
 }
 
+// Разбирает колонку related_links из строки Supabase в чистый массив
+// {icon, label, productId}. Невалидные элементы (без product_id) отбрасываются.
+function parseRelatedLinks(rawLinks){
+  return Array.isArray(rawLinks)
+    ? rawLinks
+        .filter(l => l && l.product_id)
+        .map(l => ({
+          icon: (l.icon && String(l.icon).trim()) || '🔗',
+          label: (l.label && String(l.label).trim()) || '',
+          productId: l.product_id
+        }))
+    : [];
+}
+
 // Рисует панель мини-иконок вверху карточки товара со ссылками на другие
-// товары (item.relatedLinks). Панель показывается, только если у товара
-// реально заданы ссылки, иначе остаётся скрытой.
-function renderItemRelatedLinks(item){
-  const wrap = document.getElementById('itemRelatedLinks');
+// товары. Панель показывается, только если у товара реально заданы ссылки
+// (и они ведут на существующий активный товар), иначе остаётся скрытой.
+function renderRelatedLinks(containerId, relatedLinks){
+  const wrap = document.getElementById(containerId);
   wrap.innerHTML = '';
-  const links = (item.relatedLinks || [])
+  const links = (relatedLinks || [])
     .map(l => ({ link: l, target: PRODUCTS_BY_ID[l.productId] }))
     .filter(x => !!x.target);
   if(!links.length){
@@ -2207,7 +2219,7 @@ function openItemDetail(item){
   state.currentListItem = item;
   state.itemQty = 1;
   state.itemVariantSelected = null;
-  renderItemRelatedLinks(item);
+  renderRelatedLinks('itemRelatedLinks', item.relatedLinks);
   document.getElementById('itemGlyph').textContent = item.glyph;
   document.getElementById('itemTitle').textContent = item.title;
   document.getElementById('itemSubtitle').textContent = item.sub;
