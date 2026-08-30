@@ -189,6 +189,25 @@
   }
   .chip.selected .amt{color:var(--accent-2);}
 
+  /* ---------- Related products (кросс-ссылки на карточке товара) ---------- */
+  .related-links{
+    display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; margin-bottom:14px;
+    scrollbar-width:none;
+  }
+  .related-links::-webkit-scrollbar{display:none;}
+  .related-link{
+    flex:none; display:flex; flex-direction:column; align-items:center; gap:4px;
+    width:60px; padding:8px 4px; border:1px solid var(--border); border-radius:var(--radius-sm);
+    background:var(--surface); cursor:pointer; box-shadow:var(--shadow-card);
+  }
+  .related-link * { pointer-events:none; }
+  .related-link:active{transform:scale(.95);}
+  .related-link .ico{font-size:18px; line-height:1;}
+  .related-link .lbl{
+    font-size:9.5px; color:var(--text-muted); text-align:center; line-height:1.2;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word;
+  }
+
   .field{margin-top:18px;}
   .field label{font-size:12px; color:var(--text-muted); display:block; margin-bottom:7px;}
   .field input[type=text], .field input[type=number]{
@@ -298,9 +317,9 @@
   .receipt .rhead{text-align:center; margin-bottom:14px;}
   .receipt .rhead .k{font-family:var(--font-display); font-weight:700; letter-spacing:2px; font-size:13px;}
   .receipt .rhead .id{font-size:10px; color:var(--text-faint); margin-top:4px;}
-  .receipt-row{display:flex; align-items:baseline; gap:4px; font-size:12px; margin-bottom:7px; color:var(--text-muted);}
-  .receipt-row .fill{flex:1; border-bottom:1px dotted var(--border); margin-bottom:3px;}
-  .receipt-row .value{color:var(--text); font-weight:500; white-space:nowrap;}
+  .receipt-row{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px; font-size:12px; margin-bottom:7px; color:var(--text-muted);}
+  .receipt-row .fill{flex:1 1 16px; min-width:16px; border-bottom:1px dotted var(--border); margin-bottom:3px;}
+  .receipt-row .value{color:var(--text); font-weight:500; white-space:normal; overflow-wrap:anywhere; text-align:right; max-width:100%; flex:0 1 auto;}
   .receipt .rtotal{
     display:flex; justify-content:space-between; align-items:baseline;
     border-top:1px dashed var(--border); margin-top:10px; padding-top:10px;
@@ -658,6 +677,7 @@
 
     <!-- ===================== ITEM DETAIL ===================== -->
     <section class="view" data-view="item-detail">
+      <div class="related-links" id="itemRelatedLinks" style="display:none;"></div>
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
         <div class="cat-icon" id="itemGlyph" style="background:var(--surface-2); font-size:22px;">🎮</div>
         <div>
@@ -1216,6 +1236,9 @@ let RATE_CONFIG = {};
 // (например Telegram Premium и Steam Gift Card одновременно).
 let MORE_ITEM_CONFIG = {};
 let LIST_CONFIG = {};
+// Плоский словарь id товара (row.id из таблицы products, любого type) -> запись CATALOG_ITEMS.
+// Нужен, чтобы по product_id из related_links находить, какую карточку открыть.
+let PRODUCTS_BY_ID = {};
 
 // Человеко-читаемые заголовки для групп list-item товаров (используются как
 // заголовок экрана и в старом списочном представлении). Добавляя новую
@@ -1426,6 +1449,7 @@ function buildProductConfigs(rows){
   MORE_ITEM_CONFIG = {};
   LIST_CONFIG = {};
   CATALOG_ITEMS = [];
+  PRODUCTS_BY_ID = {};
 
   rows.forEach(row => {
     if(row.active === false) return;
@@ -1463,6 +1487,7 @@ function buildProductConfigs(rows){
         category: row.category, subcats: row.subcats || [],
         type: 'rate', key: row.id
       });
+      PRODUCTS_BY_ID[row.id] = { type: 'rate', key: row.id };
 
     } else if(row.type === 'more-item'){
       // Словарь по id — так несколько товаров этого типа (Premium, Steam Gift Card
@@ -1499,6 +1524,7 @@ function buildProductConfigs(rows){
         category: row.category, subcats: row.subcats || [],
         type: 'more-item', key: row.id
       });
+      PRODUCTS_BY_ID[row.id] = { type: 'more-item', key: row.id };
 
     } else if(row.type === 'list-item'){
       const groupKey = row.group_key || 'other';
@@ -1521,13 +1547,29 @@ function buildProductConfigs(rows){
         fieldLabel2: row.field_label_2 || '',
         fieldPlaceholder2: row.field_placeholder_2 || '',
         needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
-        usernameFormat2: normalizeUsernameFormat(row.username_format_2)
+        usernameFormat2: normalizeUsernameFormat(row.username_format_2),
+        // Кросс-ссылки на другие товары для панели вверху карточки товара.
+        // Колонка related_links в Supabase — jsonb-массив объектов вида
+        // {"icon": "🎁", "label": "Подарочная карта", "product_id": "<id другого товара>"}.
+        // Если колонка пустая/NULL — панель просто не показывается. Ссылки на
+        // товар, которого нет или который выключен (active=false), тихо
+        // пропускаются при отрисовке.
+        relatedLinks: Array.isArray(row.related_links)
+          ? row.related_links
+              .filter(l => l && l.product_id)
+              .map(l => ({
+                icon: (l.icon && String(l.icon).trim()) || '🔗',
+                label: (l.label && String(l.label).trim()) || '',
+                productId: l.product_id
+              }))
+          : []
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
         type: 'list-item', listKey: groupKey, itemId: row.id
       });
+      PRODUCTS_BY_ID[row.id] = { type: 'list-item', listKey: groupKey, itemId: row.id };
     }
   });
 }
@@ -2138,10 +2180,34 @@ function renderListProduct(cat){
   });
 }
 
+// Рисует панель мини-иконок вверху карточки товара со ссылками на другие
+// товары (item.relatedLinks). Панель показывается, только если у товара
+// реально заданы ссылки, иначе остаётся скрытой.
+function renderItemRelatedLinks(item){
+  const wrap = document.getElementById('itemRelatedLinks');
+  wrap.innerHTML = '';
+  const links = (item.relatedLinks || [])
+    .map(l => ({ link: l, target: PRODUCTS_BY_ID[l.productId] }))
+    .filter(x => !!x.target);
+  if(!links.length){
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  links.forEach(({link, target}) => {
+    const el = document.createElement('div');
+    el.className = 'related-link';
+    el.innerHTML = `<div class="ico">${link.icon}</div><div class="lbl">${link.label}</div>`;
+    el.addEventListener('click', () => openCatalogItem(target));
+    wrap.appendChild(el);
+  });
+}
+
 function openItemDetail(item){
   state.currentListItem = item;
   state.itemQty = 1;
   state.itemVariantSelected = null;
+  renderItemRelatedLinks(item);
   document.getElementById('itemGlyph').textContent = item.glyph;
   document.getElementById('itemTitle').textContent = item.title;
   document.getElementById('itemSubtitle').textContent = item.sub;
