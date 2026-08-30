@@ -1180,7 +1180,7 @@ const state = {
 // чек, оформление) продолжает работать без изменений.
 let RATE_CONFIG = {};
 let PREMIUM_PLANS = [];
-let PREMIUM_PRODUCT_ID = null; // id строки type='premium' из products — нужен для create-order
+let PREMIUM_PRODUCT_ID = null; // id строки type='more-item' из products — нужен для create-order
 let PREMIUM_FIELD_LABEL = '';
 let PREMIUM_FIELD_PLACEHOLDER = '';
 let PREMIUM_NEEDS_FIELD = false;
@@ -1327,7 +1327,7 @@ const CATALOG_SUBCATEGORIES = {
 // Раньше это был статичный массив, теперь его заполняет buildProductConfigs()
 // на основе строк, загруженных из таблицы products в Supabase (см. loadProducts()).
 // type:'rate'      → открывает выбор количества (Stars/Robux); key указывает на RATE_CONFIG
-// type:'premium'   → открывает выбор срока Telegram Premium
+// type:'more-item' → открывает выбор срока/варианта (например Telegram Premium)
 // type:'list-item' → открывает карточку конкретного товара; listKey/itemId указывают на LIST_CONFIG
 let CATALOG_ITEMS = [];
 
@@ -1336,7 +1336,7 @@ let CATALOG_ITEMS = [];
 // Ожидаемые колонки таблицы products (все, кроме id/type/title/category, могут
 // быть NULL — используются только для своего типа товара):
 //   id            text   — уникальный идентификатор товара (например 'valorant-1000')
-//   type          text   — 'rate' | 'premium' | 'list-item'
+//   type          text   — 'rate' | 'more-item' | 'list-item'
 //   group_key     text   — для type='rate': ключ группы (например 'stars'/'robux');
 //                          для type='list-item': ключ группы для группировки (например 'keys'/'giftcards')
 //   title         text   — название
@@ -1351,7 +1351,7 @@ let CATALOG_ITEMS = [];
 //   field_label   text    — подпись поля получателя (только для type='rate')
 //   qty_label     text    — подпись количества (только для type='rate')
 //   hint          text    — подсказка под полем получателя (только для type='rate')
-//   variants      jsonb   — массив {label, price[, ...]}; для type='premium' — тарифы (label, months, price),
+//   variants      jsonb   — массив {label, price[, ...]}; для type='more-item' — тарифы/планы (label, months, price),
 //                          для type='list-item' — номиналы/варианты товара (label, price)
 //   sort_order    int     — порядок сортировки
 //   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
@@ -1397,7 +1397,7 @@ function buildProductConfigs(rows){
         type: 'rate', key: row.id
       });
 
-    } else if(row.type === 'premium'){
+    } else if(row.type === 'more-item'){
       PREMIUM_PRODUCT_ID = row.id;
       PREMIUM_PLANS = Array.isArray(row.variants) ? row.variants : [];
       PREMIUM_FIELD_LABEL = row.field_label || '';
@@ -1408,7 +1408,7 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'premium'
+        type: 'more-item'
       });
 
     } else if(row.type === 'list-item'){
@@ -1482,7 +1482,7 @@ function catalogItemPrice(entry){
     if(baseQty == null) baseQty = 1;
     return Math.round(baseQty * cfg.rate);
   }
-  if(entry.type === 'premium'){
+  if(entry.type === 'more-item'){
     return PREMIUM_PLANS.length ? Math.min(...PREMIUM_PLANS.map(p => Number(p.price) || 0)) : 0;
   }
   if(entry.type === 'list-item'){
@@ -1498,7 +1498,7 @@ function catalogItemPrice(entry){
   return 0;
 }
 function catalogItemHasRange(entry){
-  if(entry.type === 'rate' || entry.type === 'premium') return true;
+  if(entry.type === 'rate' || entry.type === 'more-item') return true;
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
     return !!(item && item.variants && item.variants.length);
@@ -1942,7 +1942,7 @@ function renderCatalogList(){
 function openCatalogItem(entry){
   if(entry.type === 'rate'){
     openCategory(entry.key);
-  } else if(entry.type === 'premium'){
+  } else if(entry.type === 'more-item'){
     openCategory('premium');
   } else if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
