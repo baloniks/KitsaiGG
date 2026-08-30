@@ -353,6 +353,7 @@
   .order-item .meta{flex:1; min-width:0;}
   .order-item .meta h4{font-size:13px; font-weight:600;}
   .order-item .meta span{font-size:10.5px; color:var(--text-faint); font-family:var(--font-mono);}
+  .order-item-field2{display:block; margin-top:2px; font-size:10.5px; color:var(--text-muted); font-family:var(--font-body) !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .order-item .right{text-align:right;}
   .order-item .right .price{font-family:var(--font-mono); font-weight:600; font-size:13px;}
   .order-item .chevron{color:var(--text-faint); font-size:14px; flex-shrink:0;}
@@ -2632,7 +2633,7 @@ function renderOrders(filter='all'){
     return `
     <div class="order-item" data-order-id="${o.id}">
       <div class="glyph">${o.glyph}</div>
-      <div class="meta"><h4>${o.title}</h4><span>${orderNumber(o.id)} · ${o.date}</span></div>
+      <div class="meta"><h4>${o.title}</h4><span>${orderNumber(o.id)} · ${o.date}</span>${o.recipient2 ? `<span class="order-item-field2">${o.field2Label || 'Доп. поле'}: ${o.recipient2}</span>` : ''}</div>
       <div class="right"><div class="price">${rub(o.price)}</div><div class="badge ${meta.badgeClass}">${meta.label}</div></div>
       <div class="chevron">›</div>
     </div>
@@ -2660,6 +2661,7 @@ function orderReceiptHTML(o){
     <div class="receipt-row"><span>ID заказа</span><span class="fill"></span><span class="value copy-id" data-copy="${o.id}" style="font-family:var(--font-mono); font-size:10.5px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;">${o.id}</span></div>
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${o.title}</span></div>
     ${o.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${o.recipient}</span></div>` : ''}
+    ${o.recipient2 ? `<div class="receipt-row"><span>${o.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${o.recipient2}</span></div>` : ''}
     ${o.kcoinUsed>0 ? `<div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${o.kcoinUsed.toLocaleString('ru-RU')} KC</span></div>` : ''}
     ${o.cashback>0 ? `<div class="receipt-row"><span>Начислен кэшбек</span><span class="fill"></span><span class="value" style="color:var(--green)">+ ${o.cashback.toLocaleString('ru-RU')} KC</span></div>` : ''}
     <div class="rtotal"><span class="lbl">Итого</span><span class="val">${rub(o.price)}</span></div>
