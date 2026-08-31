@@ -208,6 +208,12 @@
     font-size:9.5px; color:var(--text-muted); text-align:center; line-height:1.2;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word;
   }
+  /* Текущая страница внутри панели переходов — подсвечивается синим и не кликабельна */
+  .related-link.selected{
+    border-color:var(--accent); background:var(--accent-soft);
+    box-shadow:0 0 0 1px var(--accent) inset; cursor:default;
+  }
+  .related-link.selected .lbl{color:var(--accent-2);}
 
   .field{margin-top:18px;}
   .field label{font-size:12px; color:var(--text-muted); display:block; margin-bottom:7px;}
@@ -1531,6 +1537,12 @@ function buildProductConfigs(rows){
         usernameFormat2: normalizeUsernameFormat(row.username_format_2),
         usernameFormat: normalizeUsernameFormat(row.username_format),
         relatedLinks: parseRelatedLinks(row.related_links),
+        // Как эта карточка выглядит САМА, когда показывается первой (слева,
+        // подсвечена синим) в своей же панели переходов — см. колонку
+        // related_self в таблице products (jsonb {"icon":"...","label":"..."}).
+        // Если не заполнена — берём иконку из glyph и подпись из title.
+        selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
+        selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
         // Акция: variants — НЕ массив (то есть не список номиналов на выбор), а
         // объект вида {"old_price": 1990} — тогда отображаемая цена "от" красится
         // в красный, а old_price показывается рядом зачёркнутым.
@@ -1573,7 +1585,9 @@ function buildProductConfigs(rows){
         fieldPlaceholder2: row.field_placeholder_2 || '',
         needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
         usernameFormat2: normalizeUsernameFormat(row.username_format_2),
-        relatedLinks: parseRelatedLinks(row.related_links)
+        relatedLinks: parseRelatedLinks(row.related_links),
+        selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
+        selfLinkLabel: parseSelfLink(row.related_self).label || row.title || ''
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
@@ -1611,6 +1625,8 @@ function buildProductConfigs(rows){
         // товар, которого нет или который выключен (active=false), тихо
         // пропускаются при отрисовке.
         relatedLinks: parseRelatedLinks(row.related_links),
+        selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
+        selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
         // Акция: если variants — НЕ массив, а объект {"old_price": 1990}, то цена
         // (колонка price) красится в красный, а old_price — рядом зачёркнутым.
         // Если у товара есть настоящие номиналы (variants — массив), пометка
@@ -2009,7 +2025,7 @@ function setupConsent(prefix, title, hasDescription, onChange, customText){
 function renderRateProduct(cat){
   const cfg = RATE_CONFIG[cat];
   state.rateSelected = null;
-  renderRelatedLinks('rateRelatedLinks', cfg.relatedLinks);
+  renderRelatedLinks('rateRelatedLinks', cfg.relatedLinks, {icon: cfg.selfLinkIcon, label: cfg.selfLinkLabel});
   document.getElementById('rateFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
@@ -2130,7 +2146,7 @@ function renderPremiumProduct(id){
   state.currentCategory = id;
   state.premiumSelected = null;
   const cfg = MORE_ITEM_CONFIG[id];
-  renderRelatedLinks('premiumRelatedLinks', cfg.relatedLinks);
+  renderRelatedLinks('premiumRelatedLinks', cfg.relatedLinks, {icon: cfg.selfLinkIcon, label: cfg.selfLinkLabel});
   document.getElementById('premiumFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('premiumFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
@@ -2319,6 +2335,18 @@ function renderListProduct(cat){
   });
 }
 
+// Разбирает колонку related_self из строки Supabase — jsonb-объект вида
+// {"icon": "🇷🇺", "label": "Россия"} — в {icon, label}. Оба поля необязательны.
+// Если колонка пустая/NULL или не объект — вернёт {icon:'', label:''}, и тогда
+// при отрисовке подставятся резервные значения (glyph/title товара).
+function parseSelfLink(raw){
+  if(!raw || typeof raw !== 'object' || Array.isArray(raw)) return {icon:'', label:''};
+  return {
+    icon: (raw.icon && String(raw.icon).trim()) || '',
+    label: (raw.label && String(raw.label).trim()) || ''
+  };
+}
+
 // Разбирает колонку related_links из строки Supabase в чистый массив
 // {icon, label, productId}. Невалидные элементы (без product_id) отбрасываются.
 function parseRelatedLinks(rawLinks){
@@ -2336,7 +2364,12 @@ function parseRelatedLinks(rawLinks){
 // Рисует панель мини-иконок вверху карточки товара со ссылками на другие
 // товары. Панель показывается, только если у товара реально заданы ссылки
 // (и они ведут на существующий активный товар), иначе остаётся скрытой.
-function renderRelatedLinks(containerId, relatedLinks){
+//
+// selfLink — {icon, label} для САМОЙ ТЕКУЩЕЙ карточки. Если передан и в
+// товаре есть хотя бы одна related-ссылка, текущая карточка добавляется
+// первой (слева) и подсвечивается синим (класс .selected), чтобы было
+// видно "вы сейчас здесь". Она не кликабельна — клик по ней ничего не делает.
+function renderRelatedLinks(containerId, relatedLinks, selfLink){
   const wrap = document.getElementById(containerId);
   wrap.innerHTML = '';
   const links = (relatedLinks || [])
@@ -2347,6 +2380,14 @@ function renderRelatedLinks(containerId, relatedLinks){
     return;
   }
   wrap.style.display = '';
+
+  if(selfLink && (selfLink.icon || selfLink.label)){
+    const selfEl = document.createElement('div');
+    selfEl.className = 'related-link selected';
+    selfEl.innerHTML = `<div class="ico">${selfLink.icon || '🔗'}</div><div class="lbl">${selfLink.label || ''}</div>`;
+    wrap.appendChild(selfEl);
+  }
+
   links.forEach(({link, target}) => {
     const el = document.createElement('div');
     el.className = 'related-link';
@@ -2370,7 +2411,7 @@ function renderItemDetail(item){
   state.currentListItem = item;
   state.itemQty = 1;
   state.itemVariantSelected = null;
-  renderRelatedLinks('itemRelatedLinks', item.relatedLinks);
+  renderRelatedLinks('itemRelatedLinks', item.relatedLinks, {icon: item.selfLinkIcon, label: item.selfLinkLabel});
   document.getElementById('itemGlyph').textContent = item.glyph;
   document.getElementById('itemTitle').textContent = item.title;
   document.getElementById('itemSubtitle').textContent = item.sub;
