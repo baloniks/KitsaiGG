@@ -258,9 +258,11 @@
   }
 
   .product-description-title{
-    font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#F5B843;
-    font-family:var(--font-mono); font-weight:600; margin-top:16px; margin-bottom:8px; margin-left:2px;
+    display:inline-block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#F5B843;
+    font-family:var(--font-mono); font-weight:600; margin-top:16px; margin-bottom:8px;
     white-space:normal;
+    background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.35);
+    border-radius:var(--radius-sm); padding:7px 12px; line-height:1.4;
   }
   .product-description-title + .product-description{margin-top:0;}
 
@@ -1545,6 +1547,13 @@ function buildProductConfigs(rows){
         rate: Number(row.rate) || 0,
         unit: row.unit || '',
         glyph: row.glyph || '',
+        // Категория товара из Supabase ('games' | 'services') — источник
+        // правды для категории заказа в чеке (см. orderCategoryFromProduct
+        // и attemptBuy ниже). Раньше категория заказа бралась только из
+        // жёстко заданного словаря RATE_ORDER_CAT, из-за чего для товаров,
+        // которых там не было (например MLBB), она всегда падала на 'game',
+        // даже если сам товар в базе размечен как 'services'.
+        category: row.category || '',
         options: Array.isArray(row.options) ? row.options : [],
         // Поле получателя показывается, только если в таблице products
         // заполнен field_label. Оставьте его пустым/NULL у товара, если
@@ -1599,6 +1608,8 @@ function buildProductConfigs(rows){
       MORE_ITEM_CONFIG[row.id] = {
         title: row.title,
         glyph: row.glyph || '',
+        // См. комментарий у RATE_CONFIG.category выше — тот же принцип.
+        category: row.category || '',
         plans: Array.isArray(row.variants) ? row.variants : [],
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
@@ -2619,6 +2630,17 @@ const RATE_ORDER_CAT = { stars: 'services', robux: 'game' };
 // MORE_ITEM_ORDER_CATEGORY в supabase/functions/create-order/index.ts.
 const MORE_ITEM_ORDER_CAT = { premium: 'services', 'giftcard-steam': 'key' };
 
+// Переводит категорию товара из Supabase ('games' | 'services') в категорию
+// заказа для чека ('game' | 'services'). Это основной источник правды —
+// словари выше (RATE_ORDER_CAT / MORE_ITEM_ORDER_CAT) используются только
+// как запасной вариант для старых товаров, у которых почему-то не заполнена
+// колонка category в таблице products.
+function orderCategoryFromProduct(productCategory, fallback){
+  if(productCategory === 'games') return 'game';
+  if(productCategory === 'services') return 'services';
+  return fallback;
+}
+
 function attemptBuy(type){
   let purchase;
   if(type === 'rate'){
@@ -2645,7 +2667,7 @@ function attemptBuy(type){
     }
     const total = Math.round(state.rateSelected * cfg.rate);
     purchase = {
-      cat: (RATE_ORDER_CAT[state.currentCategory] || 'game'), glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
+      cat: orderCategoryFromProduct(cfg.category, RATE_ORDER_CAT[state.currentCategory] || 'game'), glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
       recipient: username, recipient2: username2, field2Label: cfg.fieldLabel2, price: total,
       // price выше — только для локального отображения чека до ответа сервера;
@@ -2677,7 +2699,7 @@ function attemptBuy(type){
     }
     const plan = moreItemCfg.plans[state.premiumSelected];
     purchase = {
-      cat: (MORE_ITEM_ORDER_CAT[state.currentCategory] || 'services'), glyph: moreItemCfg.glyph || '💎', title: moreItemCfg.title + ' · ' + plan.label,
+      cat: orderCategoryFromProduct(moreItemCfg.category, MORE_ITEM_ORDER_CAT[state.currentCategory] || 'services'), glyph: moreItemCfg.glyph || '💎', title: moreItemCfg.title + ' · ' + plan.label,
       recipient: username, recipient2: username2, field2Label: moreItemCfg.fieldLabel2, price: plan.price,
       product_id: state.currentCategory,
       plan_index: state.premiumSelected
