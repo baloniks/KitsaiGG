@@ -1707,17 +1707,12 @@ function catalogItemPriceLabel(entry){
 }
 
 // Возвращает { oldPrice, price } если у товара включена акция (зачёркнутая старая цена +
-// красная текущая), иначе null. Источник — колонка variants (см. комментарий выше
-// в buildProductConfigs): либо объект-пометка {old_price}, либо old_price внутри
-// конкретного варианта/тарифа в массиве variants (если акция стоит на нескольких
-// номиналах сразу — берём тот, у которого текущая цена меньше).
+// красная текущая) — но ТОЛЬКО для товаров с одной ценой (variants — объект-пометка
+// {old_price}, а не массив номиналов). Если у товара несколько номиналов/тарифов
+// (variants — массив), акция во внешнем списке (каталог/категория) НЕ показывается —
+// список остаётся обычным ("от X ₽"), а красная цена + зачёркивание видны только
+// внутри самого товара, на конкретном номинале/чипе (см. рендер чипов ниже).
 function listItemSale(item){
-  if(item.variants && item.variants.length){
-    const saled = item.variants.filter(v => v.old_price != null);
-    if(!saled.length) return null;
-    const v = saled.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
-    return { oldPrice: Number(v.old_price), price: Number(v.price) || 0 };
-  }
   return (item.saleOldPrice != null) ? { oldPrice: item.saleOldPrice, price: item.price } : null;
 }
 function listItemPriceLabel(item){
@@ -1735,12 +1730,9 @@ function catalogItemSale(entry){
     return (cfg && cfg.saleOldPrice != null) ? { oldPrice: cfg.saleOldPrice } : null;
   }
   if(entry.type === 'more-item'){
-    const cfg = MORE_ITEM_CONFIG[entry.key];
-    if(!cfg || !cfg.plans.length) return null;
-    const saled = cfg.plans.filter(p => p.old_price != null);
-    if(!saled.length) return null;
-    const p = saled.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
-    return { oldPrice: Number(p.old_price), price: Number(p.price) || 0 };
+    // У more-item всегда несколько тарифов (variants — массив) — акцию в общем
+    // списке не показываем, только внутри самого товара на конкретном тарифе.
+    return null;
   }
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
