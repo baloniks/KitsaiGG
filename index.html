@@ -36,6 +36,9 @@
     --grad-green:linear-gradient(135deg,#38D99B 0%,#22B8A6 100%);
     --danger:#FF5C6C;
     --danger-soft:rgba(255,92,108,.14);
+
+    --hot:#FF7A1A;
+    --hot-soft:rgba(255,122,26,.16);
     --radius-lg:20px;
     --radius-md:14px;
     --radius-sm:10px;
@@ -265,6 +268,19 @@
   .prod-row .buy-mini{
     margin-left:6px; background:var(--accent); color:#fff; border:none;
     border-radius:8px; padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer;
+  }
+  /* "Горящее предложение" — товар с флагом is_hot в Supabase выделяется
+     оранжевой рамкой/подсветкой и мини-бейджем с 🔥 рядом с названием. */
+  .prod-row.hot{
+    border-color:var(--hot); background:var(--hot-soft);
+    box-shadow:0 0 0 1px var(--hot) inset;
+  }
+  .prod-row .info h4{ display:flex; align-items:center; gap:6px; }
+  .hot-flag{
+    font-size:9.5px; font-weight:700; letter-spacing:.2px; color:#fff;
+    background:var(--hot); border-radius:999px; padding:2px 6px 2px 5px;
+    display:inline-flex; align-items:center; gap:2px; flex-shrink:0;
+    white-space:nowrap;
   }
 
   /* ---------- Stepper ---------- */
@@ -1473,6 +1489,10 @@ let CATALOG_ITEMS = [];
 //                          товара, ПОСЛЕ кнопки покупки (обычный description
 //                          остаётся на прежнем месте, до чекбокса согласия —
 //                          это независимое поле, заполняйте только если нужно).
+//   is_hot        bool    — «Горящее предложение». Если true — товар в списке
+//                          объявлений подсвечивается другим (оранжевым) цветом
+//                          и получает бейдж 🔥 рядом с названием. По умолчанию
+//                          false у всех товаров.
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1515,7 +1535,7 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'rate', key: row.id
+        type: 'rate', key: row.id, isHot: !!row.is_hot
       });
       PRODUCTS_BY_ID[row.id] = { type: 'rate', key: row.id };
 
@@ -1553,7 +1573,7 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'more-item', key: row.id
+        type: 'more-item', key: row.id, isHot: !!row.is_hot
       });
       PRODUCTS_BY_ID[row.id] = { type: 'more-item', key: row.id };
 
@@ -1585,12 +1605,13 @@ function buildProductConfigs(rows){
         // Если колонка пустая/NULL — панель просто не показывается. Ссылки на
         // товар, которого нет или который выключен (active=false), тихо
         // пропускаются при отрисовке.
-        relatedLinks: parseRelatedLinks(row.related_links)
+        relatedLinks: parseRelatedLinks(row.related_links),
+        isHot: !!row.is_hot
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'list-item', listKey: groupKey, itemId: row.id
+        type: 'list-item', listKey: groupKey, itemId: row.id, isHot: !!row.is_hot
       });
       PRODUCTS_BY_ID[row.id] = { type: 'list-item', listKey: groupKey, itemId: row.id };
     }
@@ -2200,10 +2221,10 @@ function renderCatalogList(){
 
   items.forEach(entry => {
     const row = document.createElement('div');
-    row.className = 'prod-row';
+    row.className = 'prod-row' + (entry.isHot ? ' hot' : '');
     row.innerHTML = `
       <div class="glyph">${entry.glyph}</div>
-      <div class="info"><h4>${entry.title}</h4><span>${entry.sub}</span></div>
+      <div class="info"><h4>${entry.isHot ? '<span class="hot-flag">🔥 Горит</span>' : ''}${entry.title}</h4><span>${entry.sub}</span></div>
       <div class="price">${catalogItemPriceLabel(entry)}</div>
       <button class="buy-mini">Купить</button>`;
     row.addEventListener('click', () => openCatalogItem(entry));
@@ -2229,10 +2250,10 @@ function renderListProduct(cat){
   wrap.innerHTML = `<div class="section-label" style="margin-top:0;">${cfg.title}</div>`;
   cfg.items.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'prod-row';
+    row.className = 'prod-row' + (item.isHot ? ' hot' : '');
     row.innerHTML = `
       <div class="glyph">${item.glyph}</div>
-      <div class="info"><h4>${item.title}</h4><span>${item.sub}</span></div>
+      <div class="info"><h4>${item.isHot ? '<span class="hot-flag">🔥 Горит</span>' : ''}${item.title}</h4><span>${item.sub}</span></div>
       <div class="price">${rub(item.price)}</div>
       <button class="buy-mini">Купить</button>`;
     
