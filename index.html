@@ -263,11 +263,12 @@
   }
 
   .product-description-title{
-    display:inline-block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#F5B843;
-    font-family:var(--font-mono); font-weight:600; margin-top:16px; margin-bottom:8px;
-    white-space:normal;
+    display:block; font-size:12.5px; letter-spacing:.2px; color:#F5B843;
+    font-family:var(--font-body); font-weight:600; margin-top:16px; margin-bottom:8px;
+    white-space:pre-line; line-height:1.5;
     background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.35);
-    border-radius:var(--radius-sm); padding:7px 12px; line-height:1.4;
+    border-radius:var(--radius-sm); padding:12px 13px;
+    overflow-wrap:break-word; word-break:break-word;
   }
   .product-description-title + .product-description{margin-top:0;}
 
