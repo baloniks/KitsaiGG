@@ -223,6 +223,11 @@
     font-size:12.5px; color:#F5B843; line-height:1.5;
     overflow-wrap:break-word; word-break:break-word;
   }
+  /* Переносы строк из колонки warning_text (напр. пустая строка между
+     абзацами) должны сохраняться, а не схлопываться в один абзац. */
+  .warning-box > div:not(.ico){
+    white-space:pre-line;
+  }
   .warning-box .ico{font-size:16px; line-height:1.4; flex-shrink:0;}
 
   .field{margin-top:18px;}
