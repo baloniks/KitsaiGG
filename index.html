@@ -257,6 +257,13 @@
     font-family:var(--font-mono); font-weight:600; margin-bottom:10px; text-align:center; white-space:normal;
   }
 
+  .product-description-title{
+    font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#F5B843;
+    font-family:var(--font-mono); font-weight:600; margin-top:16px; margin-bottom:8px; margin-left:2px;
+    white-space:normal;
+  }
+  .product-description-title + .product-description{margin-top:0;}
+
   .consent-row{
     display:flex; align-items:flex-start; gap:9px; margin-top:14px;
     font-size:12px; color:var(--text-muted); line-height:1.45; cursor:pointer;
@@ -669,6 +676,7 @@
         <span id="rateConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
+      <div class="product-description-title" id="rateDescriptionTitle" style="display:none;"></div>
       <div class="product-description" id="rateDescription" style="display:none;"></div>
       <div class="product-description-block" id="rateDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
@@ -699,6 +707,7 @@
         <span id="premiumConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
+      <div class="product-description-title" id="premiumDescriptionTitle" style="display:none;"></div>
       <div class="product-description" id="premiumDescription" style="display:none;"></div>
       <div class="product-description-block" id="premiumDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
@@ -748,6 +757,7 @@
         <span id="itemConsentText"></span>
       </label>
       <button class="btn-primary" id="btnItemBuy">Купить</button>
+      <div class="product-description-title" id="itemDescriptionTitle" style="display:none;"></div>
       <div class="product-description" id="itemDescription" style="display:none;"></div>
       <div class="product-description-block" id="itemDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
@@ -1567,6 +1577,9 @@ function buildProductConfigs(rows){
         // сумм). Показывается, только если заполнена колонка warning_text —
         // иначе баннер просто не рисуется.
         warningText: row.warning_text || '',
+        // Оранжевая надпись над первым описанием (description). Показывается,
+        // только если заполнена колонка description_title.
+        descriptionTitle: row.description_title || '',
         // Акция: variants — НЕ массив (то есть не список номиналов на выбор), а
         // объект вида {"old_price": 1990} — тогда отображаемая цена "от" красится
         // в красный, а old_price показывается рядом зачёркнутым.
@@ -1612,7 +1625,8 @@ function buildProductConfigs(rows){
         relatedLinks: parseRelatedLinks(row.related_links),
         selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
         selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
-        warningText: row.warning_text || ''
+        warningText: row.warning_text || '',
+        descriptionTitle: row.description_title || ''
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '', imageUrl: row.image_url || '',
@@ -1653,6 +1667,7 @@ function buildProductConfigs(rows){
         selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
         selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
         warningText: row.warning_text || '',
+        descriptionTitle: row.description_title || '',
         // Акция: если variants — НЕ массив, а объект {"old_price": 1990}, то цена
         // (колонка price) красится в красный, а old_price — рядом зачёркнутым.
         // Если у товара есть настоящие номиналы (variants — массив), пометка
@@ -2064,6 +2079,9 @@ function renderRateProduct(cat){
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.textContent = cfg.description;
   rateDesc.style.display = cfg.description ? '' : 'none';
+  const rateDescTitle = document.getElementById('rateDescriptionTitle');
+  rateDescTitle.textContent = cfg.descriptionTitle;
+  rateDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
   const rateDesc2 = document.getElementById('rateDescription2');
   document.getElementById('rateDescription2Text').textContent = cfg.description2;
   rateDesc2.style.display = cfg.description2 ? '' : 'none';
@@ -2188,6 +2206,9 @@ function renderPremiumProduct(id){
   const premiumDesc = document.getElementById('premiumDescription');
   premiumDesc.textContent = cfg.description;
   premiumDesc.style.display = cfg.description ? '' : 'none';
+  const premiumDescTitle = document.getElementById('premiumDescriptionTitle');
+  premiumDescTitle.textContent = cfg.descriptionTitle;
+  premiumDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
   const premiumDesc2 = document.getElementById('premiumDescription2');
   document.getElementById('premiumDescription2Text').textContent = cfg.description2;
   premiumDesc2.style.display = cfg.description2 ? '' : 'none';
@@ -2497,6 +2518,9 @@ function renderItemDetail(item){
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.textContent = item.description;
   itemDesc.style.display = item.description ? '' : 'none';
+  const itemDescTitle = document.getElementById('itemDescriptionTitle');
+  itemDescTitle.textContent = item.descriptionTitle;
+  itemDescTitle.style.display = (item.description && item.descriptionTitle) ? '' : 'none';
   const itemDesc2 = document.getElementById('itemDescription2');
   document.getElementById('itemDescription2Text').textContent = item.description2;
   itemDesc2.style.display = item.description2 ? '' : 'none';
