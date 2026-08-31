@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -266,11 +266,11 @@
     font-family:var(--font-mono); font-weight:600; font-size:13.5px; white-space:nowrap;
     display:flex; flex-direction:column; align-items:flex-end; gap:1px;
   }
-  .prod-row .price .price-old{
+  .price-old{
     font-size:10.5px; font-weight:500; color:var(--text-faint);
     text-decoration:line-through; white-space:nowrap;
   }
-  .prod-row .price .price-current.sale{ color:var(--danger); }
+  .price-current.sale{ color:var(--danger); }
   .prod-row .buy-mini{
     margin-left:6px; background:var(--accent); color:#fff; border:none;
     border-radius:8px; padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer;
@@ -1700,22 +1700,29 @@ function catalogItemHasRange(entry){
   return false;
 }
 function catalogItemPriceLabel(entry){
+  const sale = catalogItemSale(entry);
+  if(sale && sale.price != null) return rub(sale.price);
   const price = catalogItemPrice(entry);
   return catalogItemHasRange(entry) ? 'от ' + rub(price) : rub(price);
 }
 
-// Возвращает { oldPrice } если у товара включена акция (зачёркнутая старая цена +
+// Возвращает { oldPrice, price } если у товара включена акция (зачёркнутая старая цена +
 // красная текущая), иначе null. Источник — колонка variants (см. комментарий выше
 // в buildProductConfigs): либо объект-пометка {old_price}, либо old_price внутри
-// конкретного варианта/тарифа в массиве variants.
+// конкретного варианта/тарифа в массиве variants (если акция стоит на нескольких
+// номиналах сразу — берём тот, у которого текущая цена меньше).
 function listItemSale(item){
   if(item.variants && item.variants.length){
-    const minVariant = item.variants.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
-    return (minVariant && minVariant.old_price != null) ? { oldPrice: Number(minVariant.old_price) } : null;
+    const saled = item.variants.filter(v => v.old_price != null);
+    if(!saled.length) return null;
+    const v = saled.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
+    return { oldPrice: Number(v.old_price), price: Number(v.price) || 0 };
   }
-  return (item.saleOldPrice != null) ? { oldPrice: item.saleOldPrice } : null;
+  return (item.saleOldPrice != null) ? { oldPrice: item.saleOldPrice, price: item.price } : null;
 }
 function listItemPriceLabel(item){
+  const sale = listItemSale(item);
+  if(sale) return rub(sale.price);
   if(item.variants && item.variants.length){
     const minPrice = Math.min(...item.variants.map(v => Number(v.price) || 0));
     return 'от ' + rub(minPrice);
@@ -1730,8 +1737,10 @@ function catalogItemSale(entry){
   if(entry.type === 'more-item'){
     const cfg = MORE_ITEM_CONFIG[entry.key];
     if(!cfg || !cfg.plans.length) return null;
-    const minPlan = cfg.plans.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
-    return (minPlan && minPlan.old_price != null) ? { oldPrice: Number(minPlan.old_price) } : null;
+    const saled = cfg.plans.filter(p => p.old_price != null);
+    if(!saled.length) return null;
+    const p = saled.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
+    return { oldPrice: Number(p.old_price), price: Number(p.price) || 0 };
   }
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
@@ -2387,6 +2396,8 @@ function renderItemDetail(item){
 
   // Товар с несколькими номиналами (variants) — рисуем чипы выбора,
   // как у Telegram Premium; без variants блок просто скрыт.
+  // Если у конкретного номинала задан old_price — показываем его цену красным
+  // и зачёркнутую старую цену рядом, прямо на самой кнопке-варианте.
   const variantGrid = document.getElementById('itemVariants');
   variantGrid.innerHTML = '';
   if(item.variants){
@@ -2394,7 +2405,10 @@ function renderItemDetail(item){
     item.variants.forEach((v, i) => {
       const chip = document.createElement('div');
       chip.className = 'chip';
-      chip.innerHTML = `<div class="amt">${v.label}</div>`;
+      const hasSale = v.old_price != null;
+      chip.innerHTML = `
+        <div class="amt">${v.label}</div>
+        <div class="sub">${hasSale ? `<span class="price-old">${rub(Number(v.old_price))}</span> ` : ''}<span class="${hasSale ? 'price-current sale' : ''}">${rub(Number(v.price) || 0)}</span></div>`;
       chip.addEventListener('click', () => selectItemVariant(i, chip));
       variantGrid.appendChild(chip);
     });
@@ -2436,9 +2450,15 @@ function updateItemSummary(){
     ? item.variants[state.itemVariantSelected]
     : null;
   const unitPrice = hasVariants ? (selectedVariant ? Number(selectedVariant.price) || 0 : null) : item.price;
+  // Акция (old_price) — у выбранного номинала, либо у самого товара, если у него
+  // нет номиналов (variants — объект-пометка, см. saleOldPrice).
+  const saleOldPrice = hasVariants
+    ? (selectedVariant && selectedVariant.old_price != null ? Number(selectedVariant.old_price) : null)
+    : (item.saleOldPrice != null ? item.saleOldPrice : null);
 
   document.getElementById('itemQty').textContent = state.itemQty;
-  document.getElementById('itemUnitPrice').textContent = unitPrice != null ? rub(unitPrice) : '—';
+  const unitPriceEl = document.getElementById('itemUnitPrice');
+  unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
   document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— ₽';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
