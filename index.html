@@ -215,6 +215,16 @@
   }
   .related-link.selected .lbl{color:var(--accent-2);}
 
+  /* ---------- Предупреждение над товаром (оранжевый баннер) ---------- */
+  .warning-box{
+    display:flex; align-items:flex-start; gap:10px;
+    background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.35);
+    border-radius:var(--radius-sm); padding:12px 13px; margin-bottom:14px;
+    font-size:12.5px; color:#F5B843; line-height:1.5;
+    overflow-wrap:break-word; word-break:break-word;
+  }
+  .warning-box .ico{font-size:16px; line-height:1.4; flex-shrink:0;}
+
   .field{margin-top:18px;}
   .field label{font-size:12px; color:var(--text-muted); display:block; margin-bottom:7px;}
   .field input[type=text], .field input[type=number]{
@@ -634,6 +644,7 @@
     <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
       <div class="related-links" id="rateRelatedLinks" style="display:none;"></div>
+      <div class="warning-box" id="rateWarning" style="display:none;"><div class="ico">⚠️</div><div id="rateWarningText"></div></div>
       <div class="chip-grid" id="rateChips"></div>
       <div class="field" id="rateCustomWrap" style="display:none;">
         <label id="rateCustomLabel">Своё количество</label>
@@ -668,6 +679,7 @@
     <!-- ===================== PREMIUM ===================== -->
     <section class="view" data-view="premium-product">
       <div class="related-links" id="premiumRelatedLinks" style="display:none;"></div>
+      <div class="warning-box" id="premiumWarning" style="display:none;"><div class="ico">⚠️</div><div id="premiumWarningText"></div></div>
       <div class="chip-grid" id="premiumChips" style="grid-template-columns:1fr 1fr;"></div>
       <div class="field" id="premiumFieldWrap">
         <label id="premiumFieldLabel">Юзернейм получателя</label>
@@ -702,6 +714,7 @@
     <!-- ===================== ITEM DETAIL ===================== -->
     <section class="view" data-view="item-detail">
       <div class="related-links" id="itemRelatedLinks" style="display:none;"></div>
+      <div class="warning-box" id="itemWarning" style="display:none;"><div class="ico">⚠️</div><div id="itemWarningText"></div></div>
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
         <div class="cat-icon" id="itemGlyph" style="background:var(--surface-2); font-size:22px;">🎮</div>
         <div>
@@ -1550,6 +1563,10 @@ function buildProductConfigs(rows){
         // Если не заполнена — берём иконку из glyph и подпись из title.
         selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
         selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
+        // Оранжевое предупреждение над товаром (между переходами и сеткой
+        // сумм). Показывается, только если заполнена колонка warning_text —
+        // иначе баннер просто не рисуется.
+        warningText: row.warning_text || '',
         // Акция: variants — НЕ массив (то есть не список номиналов на выбор), а
         // объект вида {"old_price": 1990} — тогда отображаемая цена "от" красится
         // в красный, а old_price показывается рядом зачёркнутым.
@@ -1594,7 +1611,8 @@ function buildProductConfigs(rows){
         usernameFormat2: normalizeUsernameFormat(row.username_format_2),
         relatedLinks: parseRelatedLinks(row.related_links),
         selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
-        selfLinkLabel: parseSelfLink(row.related_self).label || row.title || ''
+        selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
+        warningText: row.warning_text || ''
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '', imageUrl: row.image_url || '',
@@ -1634,6 +1652,7 @@ function buildProductConfigs(rows){
         relatedLinks: parseRelatedLinks(row.related_links),
         selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
         selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
+        warningText: row.warning_text || '',
         // Акция: если variants — НЕ массив, а объект {"old_price": 1990}, то цена
         // (колонка price) красится в красный, а old_price — рядом зачёркнутым.
         // Если у товара есть настоящие номиналы (variants — массив), пометка
@@ -2033,6 +2052,7 @@ function renderRateProduct(cat){
   const cfg = RATE_CONFIG[cat];
   state.rateSelected = null;
   renderRelatedLinks('rateRelatedLinks', cfg.relatedLinks, {icon: cfg.selfLinkIcon, label: cfg.selfLinkLabel});
+  renderWarningBox('rateWarning', 'rateWarningText', cfg.warningText);
   document.getElementById('rateFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
@@ -2154,6 +2174,7 @@ function renderPremiumProduct(id){
   state.premiumSelected = null;
   const cfg = MORE_ITEM_CONFIG[id];
   renderRelatedLinks('premiumRelatedLinks', cfg.relatedLinks, {icon: cfg.selfLinkIcon, label: cfg.selfLinkLabel});
+  renderWarningBox('premiumWarning', 'premiumWarningText', cfg.warningText);
   document.getElementById('premiumFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('premiumFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
@@ -2353,6 +2374,20 @@ function glyphHtml(glyph, imageUrl){
   return glyph || '';
 }
 
+// Показывает/скрывает оранжевый баннер-предупреждение над товаром.
+// text — значение колонки warning_text у товара; если пусто/NULL, баннер
+// просто скрывается (по умолчанию его нет ни у одного товара).
+function renderWarningBox(boxId, textId, text){
+  const box = document.getElementById(boxId);
+  const trimmed = (text || '').trim();
+  if(!trimmed){
+    box.style.display = 'none';
+    return;
+  }
+  document.getElementById(textId).textContent = trimmed;
+  box.style.display = '';
+}
+
 // Разбирает колонку related_self из строки Supabase — jsonb-объект вида
 // {"icon": "🇷🇺", "label": "Россия"} — в {icon, label}. Оба поля необязательны.
 // Если колонка пустая/NULL или не объект — вернёт {icon:'', label:''}, и тогда
@@ -2447,6 +2482,7 @@ function renderItemDetail(item){
   state.itemQty = 1;
   state.itemVariantSelected = null;
   renderRelatedLinks('itemRelatedLinks', item.relatedLinks, {icon: item.selfLinkIcon, label: item.selfLinkLabel});
+  renderWarningBox('itemWarning', 'itemWarningText', item.warningText);
   document.getElementById('itemGlyph').innerHTML = glyphHtml(item.glyph, item.imageUrl);
   document.getElementById('itemTitle').textContent = item.title;
   document.getElementById('itemSubtitle').textContent = item.sub;
