@@ -37,8 +37,6 @@
     --danger:#FF5C6C;
     --danger-soft:rgba(255,92,108,.14);
 
-    --hot:#FF7A1A;
-    --hot-soft:rgba(255,122,26,.16);
     --radius-lg:20px;
     --radius-md:14px;
     --radius-sm:10px;
@@ -264,23 +262,18 @@
   .prod-row .info{flex:1; min-width:0;}
   .prod-row .info h4{font-size:13.5px; font-weight:600;}
   .prod-row .info span{font-size:11px; color:var(--text-faint);}
-  .prod-row .price{font-family:var(--font-mono); font-weight:600; font-size:13.5px; white-space:nowrap;}
+  .prod-row .price{
+    font-family:var(--font-mono); font-weight:600; font-size:13.5px; white-space:nowrap;
+    display:flex; flex-direction:column; align-items:flex-end; gap:1px;
+  }
+  .prod-row .price .price-old{
+    font-size:10.5px; font-weight:500; color:var(--text-faint);
+    text-decoration:line-through; white-space:nowrap;
+  }
+  .prod-row .price .price-current.sale{ color:var(--danger); }
   .prod-row .buy-mini{
     margin-left:6px; background:var(--accent); color:#fff; border:none;
     border-radius:8px; padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer;
-  }
-  /* "Горящее предложение" — товар с флагом is_hot в Supabase выделяется
-     оранжевой рамкой/подсветкой и мини-бейджем с 🔥 рядом с названием. */
-  .prod-row.hot{
-    border-color:var(--hot); background:var(--hot-soft);
-    box-shadow:0 0 0 1px var(--hot) inset;
-  }
-  .prod-row .info h4{ display:flex; align-items:center; gap:6px; }
-  .hot-flag{
-    font-size:9.5px; font-weight:700; letter-spacing:.2px; color:#fff;
-    background:var(--hot); border-radius:999px; padding:2px 6px 2px 5px;
-    display:inline-flex; align-items:center; gap:2px; flex-shrink:0;
-    white-space:nowrap;
   }
 
   /* ---------- Stepper ---------- */
@@ -1453,8 +1446,19 @@ let CATALOG_ITEMS = [];
 //   qty_label     text    — для type='rate' — подпись количества; для
 //                          type='more-item' — подпись строки над ценой
 //                          (по умолчанию "Подписка", можно поставить "Тариф" и т.п.)
-//   variants      jsonb   — массив {label, price[, ...]}; для type='more-item' — тарифы/планы (label, months, price),
-//                          для type='list-item' — номиналы/варианты товара (label, price)
+//   variants      jsonb   — если МАССИВ {label, price[, ...]}: для type='more-item' —
+//                          тарифы/планы (label, months, price), для type='list-item' —
+//                          номиналы/варианты товара (label, price). Любой объект внутри
+//                          такого массива может дополнительно содержать old_price —
+//                          тогда именно у этого варианта/тарифа цена красится в красный,
+//                          а old_price показывается рядом зачёркнутым (см. ниже).
+//                          Если ОБЪЕКТ (не массив), например {"old_price": 1990}: это
+//                          не список вариантов на выбор, а просто пометка «акция» —
+//                          применяется к обычной (единственной) цене товара: для
+//                          type='list-item' — к колонке price, для type='rate' — к
+//                          отображаемой цене "от". Цена красится в красный, old_price
+//                          показывается рядом зачёркнутым. Ничего дополнительно
+//                          настраивать/мигрировать не нужно — это та же колонка variants.
 //   sort_order    int     — порядок сортировки
 //   active        bool    — показывать ли товар (используется и в SQL-фильтре, и здесь на всякий случай)
 //   username_format text[] — включает проверку формата поля получателя перед
@@ -1489,10 +1493,6 @@ let CATALOG_ITEMS = [];
 //                          товара, ПОСЛЕ кнопки покупки (обычный description
 //                          остаётся на прежнем месте, до чекбокса согласия —
 //                          это независимое поле, заполняйте только если нужно).
-//   is_hot        bool    — «Горящее предложение». Если true — товар в списке
-//                          объявлений подсвечивается другим (оранжевым) цветом
-//                          и получает бейдж 🔥 рядом с названием. По умолчанию
-//                          false у всех товаров.
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1530,12 +1530,17 @@ function buildProductConfigs(rows){
         needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
         usernameFormat2: normalizeUsernameFormat(row.username_format_2),
         usernameFormat: normalizeUsernameFormat(row.username_format),
-        relatedLinks: parseRelatedLinks(row.related_links)
+        relatedLinks: parseRelatedLinks(row.related_links),
+        // Акция: variants — НЕ массив (то есть не список номиналов на выбор), а
+        // объект вида {"old_price": 1990} — тогда отображаемая цена "от" красится
+        // в красный, а old_price показывается рядом зачёркнутым.
+        saleOldPrice: (row.variants && !Array.isArray(row.variants) && row.variants.old_price != null)
+          ? Number(row.variants.old_price) : null
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'rate', key: row.id, isHot: !!row.is_hot
+        type: 'rate', key: row.id
       });
       PRODUCTS_BY_ID[row.id] = { type: 'rate', key: row.id };
 
@@ -1573,7 +1578,7 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'more-item', key: row.id, isHot: !!row.is_hot
+        type: 'more-item', key: row.id
       });
       PRODUCTS_BY_ID[row.id] = { type: 'more-item', key: row.id };
 
@@ -1606,12 +1611,18 @@ function buildProductConfigs(rows){
         // товар, которого нет или который выключен (active=false), тихо
         // пропускаются при отрисовке.
         relatedLinks: parseRelatedLinks(row.related_links),
-        isHot: !!row.is_hot
+        // Акция: если variants — НЕ массив, а объект {"old_price": 1990}, то цена
+        // (колонка price) красится в красный, а old_price — рядом зачёркнутым.
+        // Если у товара есть настоящие номиналы (variants — массив), пометка
+        // акции ставится персонально на нужный номинал через его собственное
+        // поле old_price внутри массива — см. комментарий у колонки variants выше.
+        saleOldPrice: (row.variants && !Array.isArray(row.variants) && row.variants.old_price != null)
+          ? Number(row.variants.old_price) : null
       });
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'list-item', listKey: groupKey, itemId: row.id, isHot: !!row.is_hot
+        type: 'list-item', listKey: groupKey, itemId: row.id
       });
       PRODUCTS_BY_ID[row.id] = { type: 'list-item', listKey: groupKey, itemId: row.id };
     }
@@ -1691,6 +1702,48 @@ function catalogItemHasRange(entry){
 function catalogItemPriceLabel(entry){
   const price = catalogItemPrice(entry);
   return catalogItemHasRange(entry) ? 'от ' + rub(price) : rub(price);
+}
+
+// Возвращает { oldPrice } если у товара включена акция (зачёркнутая старая цена +
+// красная текущая), иначе null. Источник — колонка variants (см. комментарий выше
+// в buildProductConfigs): либо объект-пометка {old_price}, либо old_price внутри
+// конкретного варианта/тарифа в массиве variants.
+function listItemSale(item){
+  if(item.variants && item.variants.length){
+    const minVariant = item.variants.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
+    return (minVariant && minVariant.old_price != null) ? { oldPrice: Number(minVariant.old_price) } : null;
+  }
+  return (item.saleOldPrice != null) ? { oldPrice: item.saleOldPrice } : null;
+}
+function listItemPriceLabel(item){
+  if(item.variants && item.variants.length){
+    const minPrice = Math.min(...item.variants.map(v => Number(v.price) || 0));
+    return 'от ' + rub(minPrice);
+  }
+  return rub(item.price);
+}
+function catalogItemSale(entry){
+  if(entry.type === 'rate'){
+    const cfg = RATE_CONFIG[entry.key];
+    return (cfg && cfg.saleOldPrice != null) ? { oldPrice: cfg.saleOldPrice } : null;
+  }
+  if(entry.type === 'more-item'){
+    const cfg = MORE_ITEM_CONFIG[entry.key];
+    if(!cfg || !cfg.plans.length) return null;
+    const minPlan = cfg.plans.reduce((a, b) => (Number(a.price) || 0) <= (Number(b.price) || 0) ? a : b);
+    return (minPlan && minPlan.old_price != null) ? { oldPrice: Number(minPlan.old_price) } : null;
+  }
+  if(entry.type === 'list-item'){
+    const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
+    return item ? listItemSale(item) : null;
+  }
+  return null;
+}
+// Собирает HTML для ячейки цены: обычная цена, либо зачёркнутая старая +
+// текущая красным, если у товара есть акция (sale).
+function renderPriceCell(currentLabel, sale){
+  if(!sale) return `<span class="price-current">${currentLabel}</span>`;
+  return `<span class="price-old">${rub(sale.oldPrice)}</span><span class="price-current sale">${currentLabel}</span>`;
 }
 
 /* ---------------- HELPERS ---------------- */
@@ -2221,11 +2274,11 @@ function renderCatalogList(){
 
   items.forEach(entry => {
     const row = document.createElement('div');
-    row.className = 'prod-row' + (entry.isHot ? ' hot' : '');
+    row.className = 'prod-row';
     row.innerHTML = `
       <div class="glyph">${entry.glyph}</div>
-      <div class="info"><h4>${entry.isHot ? '<span class="hot-flag">🔥 Горит</span>' : ''}${entry.title}</h4><span>${entry.sub}</span></div>
-      <div class="price">${catalogItemPriceLabel(entry)}</div>
+      <div class="info"><h4>${entry.title}</h4><span>${entry.sub}</span></div>
+      <div class="price">${renderPriceCell(catalogItemPriceLabel(entry), catalogItemSale(entry))}</div>
       <button class="buy-mini">Купить</button>`;
     row.addEventListener('click', () => openCatalogItem(entry));
     wrap.appendChild(row);
@@ -2250,11 +2303,11 @@ function renderListProduct(cat){
   wrap.innerHTML = `<div class="section-label" style="margin-top:0;">${cfg.title}</div>`;
   cfg.items.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'prod-row' + (item.isHot ? ' hot' : '');
+    row.className = 'prod-row';
     row.innerHTML = `
       <div class="glyph">${item.glyph}</div>
-      <div class="info"><h4>${item.isHot ? '<span class="hot-flag">🔥 Горит</span>' : ''}${item.title}</h4><span>${item.sub}</span></div>
-      <div class="price">${rub(item.price)}</div>
+      <div class="info"><h4>${item.title}</h4><span>${item.sub}</span></div>
+      <div class="price">${renderPriceCell(listItemPriceLabel(item), listItemSale(item))}</div>
       <button class="buy-mini">Купить</button>`;
     
     row.addEventListener('click', () => openItemDetail(item));
