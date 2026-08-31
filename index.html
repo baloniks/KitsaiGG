@@ -2340,10 +2340,14 @@ function renderListProduct(cat){
 // Если колонка пустая/NULL или не объект — вернёт {icon:'', label:''}, и тогда
 // при отрисовке подставятся резервные значения (glyph/title товара).
 function parseSelfLink(raw){
-  if(!raw || typeof raw !== 'object' || Array.isArray(raw)) return {icon:'', label:''};
+  // На случай, если в Supabase значение по ошибке записали как массив
+  // [{"icon":"...", "label":"..."}] вместо объекта {"icon":"...", "label":"..."} —
+  // берём первый элемент, чтобы кнопка всё равно отобразилась правильно.
+  const obj = Array.isArray(raw) ? raw[0] : raw;
+  if(!obj || typeof obj !== 'object' || Array.isArray(obj)) return {icon:'', label:''};
   return {
-    icon: (raw.icon && String(raw.icon).trim()) || '',
-    label: (raw.label && String(raw.label).trim()) || ''
+    icon: (obj.icon && String(obj.icon).trim()) || '',
+    label: (obj.label && String(obj.label).trim()) || ''
   };
 }
 
