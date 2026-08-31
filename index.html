@@ -3530,14 +3530,56 @@ document.addEventListener('DOMContentLoaded', () => {
     pushView('ticket', {sub:true, title:'Новый тикет'});
   });
 
-  // Отправка тикета
-  document.getElementById('btnTicketSubmit').addEventListener('click', () => {
+  // Отправка тикета — реально шлёт тикет в Edge Function create-ticket,
+  // которая пересылает его тем же ботом в тот же Telegram-чат, куда падают
+  // уведомления о заказах (см. supabase/functions/create-ticket/index.ts).
+  document.getElementById('btnTicketSubmit').addEventListener('click', async () => {
     const msg = document.getElementById('ticketMsg').value.trim();
     if (!msg) { showToast('Опишите проблему'); return; }
-    document.getElementById('ticketOrder').value = '';
-    document.getElementById('ticketMsg').value = '';
-    showToast('Тикет отправлен');
-    goBack();
+
+    if (!supabaseClient) {
+      showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
+      return;
+    }
+    const initData = getTelegramInitData();
+    if (!initData) {
+      showToast('Откройте приложение через Telegram-бота, чтобы отправить тикет');
+      return;
+    }
+
+    const topic = document.getElementById('ticketTopic').value;
+    const orderNum = document.getElementById('ticketOrder').value.trim();
+
+    const btn = document.getElementById('btnTicketSubmit');
+    const prevText = btn.textContent;
+    btn.textContent = 'Отправляем...';
+    btn.classList.add('disabled');
+
+    try {
+      const { data, error } = await supabaseClient.functions.invoke('create-ticket', {
+        body: {
+          init_data: initData,
+          topic: topic,
+          order_number: orderNum || null,
+          message: msg
+        }
+      });
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'unknown_error');
+      }
+
+      document.getElementById('ticketOrder').value = '';
+      document.getElementById('ticketMsg').value = '';
+      showToast('Тикет отправлен' + (data?.ticket_number ? ` · ${data.ticket_number}` : ''));
+      goBack();
+    } catch (e) {
+      console.error('create-ticket error:', e);
+      showToast('Не удалось отправить тикет. Попробуйте ещё раз');
+    } finally {
+      btn.textContent = prevText;
+      btn.classList.remove('disabled');
+    }
   });
 
   // Промокод
