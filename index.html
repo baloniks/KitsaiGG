@@ -1943,13 +1943,16 @@ async function loadReferralStats(){
 }
 
 function openExternalLink(url) {
-  if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openTelegramLink === 'function' && url.includes('t.me')) {
-    window.Telegram.WebApp.openTelegramLink(url);
-  } else if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === 'function' && !url.includes('t.me')) {
-    window.Telegram.WebApp.openLink(url);
-  } else {
-    window.open(url, '_blank');
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg && url.includes('t.me') && typeof tg.openTelegramLink === 'function') {
+    tg.openTelegramLink(url);
+    return;
   }
+  if (tg && typeof tg.openLink === 'function') {
+    tg.openLink(url);
+    return;
+  }
+  window.open(url, '_blank');
 }
 
 /* ---------------- CORE ROUTING (VIEW MANAGEMENT) ---------------- */
@@ -3522,7 +3525,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Открыть чат поддержки в Telegram
   document.getElementById('btnTgSupport').addEventListener('click', () => {
-    openExternalLink('https://t.me/kitsaigg_support');
+    openExternalLink('https://t.me/Manager_KitsaiGG');
   });
 
   // Перейти к созданию тикета из экрана поддержки
