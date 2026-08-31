@@ -242,19 +242,19 @@
   }
 
   .product-description{
-    margin-top:14px; margin-bottom:2px; padding:12px 13px;
+    margin-top:16px; margin-bottom:2px; padding:12px 13px;
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm);
     font-size:12.5px; color:var(--text-muted); line-height:1.55; white-space:pre-line;
     overflow-wrap:break-word; word-break:break-word;
   }
   .product-description-block{
-    margin-top:28px; margin-bottom:2px; padding-top:20px;
+    margin-top:22px; margin-bottom:2px; padding-top:20px;
     border-top:1px solid var(--border);
   }
   .product-description-block .product-description{margin-top:0; margin-bottom:0;}
   .product-description-label{
-    font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text-faint);
-    font-family:var(--font-mono); margin-bottom:8px; margin-left:2px; white-space:normal;
+    font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent-2);
+    font-family:var(--font-mono); font-weight:600; margin-bottom:10px; text-align:center; white-space:normal;
   }
 
   .consent-row{
@@ -664,12 +664,12 @@
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— ₽</span></div>
       </div>
-      <div class="product-description" id="rateDescription" style="display:none;"></div>
       <label class="consent-row" id="rateConsentWrap">
         <input type="checkbox" id="rateConsent">
         <span id="rateConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
+      <div class="product-description" id="rateDescription" style="display:none;"></div>
       <div class="product-description-block" id="rateDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
         <div class="product-description" id="rateDescription2Text"></div>
@@ -694,12 +694,12 @@
         <div class="row"><span id="premiumPlanLabel">Подписка</span><span id="premiumPlanVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
       </div>
-      <div class="product-description" id="premiumDescription" style="display:none;"></div>
       <label class="consent-row" id="premiumConsentWrap">
         <input type="checkbox" id="premiumConsent">
         <span id="premiumConsentText"></span>
       </label>
       <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
+      <div class="product-description" id="premiumDescription" style="display:none;"></div>
       <div class="product-description-block" id="premiumDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
         <div class="product-description" id="premiumDescription2Text"></div>
@@ -739,7 +739,6 @@
           <button id="btnQtyPlus">+</button>
         </div>
       </div>
-      <div class="product-description" id="itemDescription" style="display:none;"></div>
       <div class="order-bar">
         <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— ₽</span></div>
@@ -749,6 +748,7 @@
         <span id="itemConsentText"></span>
       </label>
       <button class="btn-primary" id="btnItemBuy">Купить</button>
+      <div class="product-description" id="itemDescription" style="display:none;"></div>
       <div class="product-description-block" id="itemDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
         <div class="product-description" id="itemDescription2Text"></div>
