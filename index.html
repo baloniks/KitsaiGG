@@ -1744,7 +1744,7 @@ function catalogItemSale(entry){
 // текущая красным, если у товара есть акция (sale).
 function renderPriceCell(currentLabel, sale){
   if(!sale) return `<span class="price-current">${currentLabel}</span>`;
-  return `<span class="price-old">${rub(sale.oldPrice)}</span><span class="price-current sale">${currentLabel}</span>`;
+  return `<span class="price-current sale">${currentLabel}</span><span class="price-old">${rub(sale.oldPrice)}</span>`;
 }
 
 /* ---------------- HELPERS ---------------- */
@@ -2156,7 +2156,7 @@ function renderPremiumProduct(id){
     const hasSale = p.old_price != null;
     chip.innerHTML = `
       <div class="amt">${p.label}</div>
-      <div class="sub">${hasSale ? `<span class="price-old">${rub(Number(p.old_price))}</span> ` : ''}<span class="${hasSale ? 'price-current sale' : ''}">${rub(p.price)}</span></div>`;
+      <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(p.price)}</span>${hasSale ? ` <span class="price-old">${rub(Number(p.old_price))}</span>` : ''}</div>`;
     chip.addEventListener('click', () => selectPremium(i, chip));
     grid.appendChild(chip);
   });
@@ -2182,7 +2182,7 @@ function updatePremiumSummary(){
   }
   const plan = cfg.plans[state.premiumSelected];
   document.getElementById('premiumPlanVal').textContent = plan.label;
-  document.getElementById('premiumTotalVal').innerHTML = renderPriceCell(rub(plan.price), plan.old_price != null ? { oldPrice: Number(plan.old_price) } : null);
+  document.getElementById('premiumTotalVal').textContent = rub(plan.price);
   btn.textContent = 'Купить за ' + rub(plan.price);
   if(document.getElementById('premiumConsent').checked){
     btn.classList.remove('disabled');
@@ -2403,7 +2403,7 @@ function renderItemDetail(item){
       const hasSale = v.old_price != null;
       chip.innerHTML = `
         <div class="amt">${v.label}</div>
-        <div class="sub">${hasSale ? `<span class="price-old">${rub(Number(v.old_price))}</span> ` : ''}<span class="${hasSale ? 'price-current sale' : ''}">${rub(Number(v.price) || 0)}</span></div>`;
+        <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(Number(v.price) || 0)}</span>${hasSale ? ` <span class="price-old">${rub(Number(v.old_price))}</span>` : ''}</div>`;
       chip.addEventListener('click', () => selectItemVariant(i, chip));
       variantGrid.appendChild(chip);
     });
