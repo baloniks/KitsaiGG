@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -2161,7 +2161,10 @@ function renderPremiumProduct(id){
   cfg.plans.forEach((p, i) => {
     const chip = document.createElement('div');
     chip.className = 'chip';
-    chip.innerHTML = `<div class="amt">${p.label}</div><div class="sub">${rub(p.price)}</div>`;
+    const hasSale = p.old_price != null;
+    chip.innerHTML = `
+      <div class="amt">${p.label}</div>
+      <div class="sub">${hasSale ? `<span class="price-old">${rub(Number(p.old_price))}</span> ` : ''}<span class="${hasSale ? 'price-current sale' : ''}">${rub(p.price)}</span></div>`;
     chip.addEventListener('click', () => selectPremium(i, chip));
     grid.appendChild(chip);
   });
@@ -2187,7 +2190,7 @@ function updatePremiumSummary(){
   }
   const plan = cfg.plans[state.premiumSelected];
   document.getElementById('premiumPlanVal').textContent = plan.label;
-  document.getElementById('premiumTotalVal').textContent = rub(plan.price);
+  document.getElementById('premiumTotalVal').innerHTML = renderPriceCell(rub(plan.price), plan.old_price != null ? { oldPrice: Number(plan.old_price) } : null);
   btn.textContent = 'Купить за ' + rub(plan.price);
   if(document.getElementById('premiumConsent').checked){
     btn.classList.remove('disabled');
