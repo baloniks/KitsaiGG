@@ -179,10 +179,13 @@
     border-radius:var(--radius-sm); padding:12px 6px;
     text-align:center; cursor:pointer; transition:all .12s;
     box-shadow:var(--shadow-card);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    min-height:56px; gap:2px;
   }
   .chip * { pointer-events: none; }
   .chip:active{transform:scale(.95);}
-  .chip .amt{font-family:var(--font-mono); font-weight:600; font-size:14px;}
+  .chip .amt{font-family:var(--font-mono); font-weight:600; font-size:14px; line-height:1.25;}
+  .chip .amt.long{font-size:11.5px; line-height:1.3;}
   .chip .sub{font-size:10px; color:var(--text-faint); margin-top:2px;}
   .chip.selected{
     border-color:var(--accent); background:var(--accent-soft);
@@ -2240,8 +2243,15 @@ function renderPremiumProduct(id){
     const chip = document.createElement('div');
     chip.className = 'chip';
     const hasSale = p.old_price != null;
+    // Длинные названия тарифов (>16 символов) занимают несколько строк и
+    // "распирают" карточку — уменьшаем им шрифт, чтобы карточки в одном
+    // ряду были ближе по высоте и не выглядели разбалансированными
+    // (см. .chip .amt.long в CSS). Контент внутри .chip теперь ещё и
+    // центрируется по вертикали (justify-content:center), поэтому короткие
+    // названия смотрятся ровно, даже если сосед в ряду длиннее.
+    const isLong = String(p.label || '').length > 16;
     chip.innerHTML = `
-      <div class="amt">${p.label}</div>
+      <div class="amt${isLong ? ' long' : ''}">${p.label}</div>
       <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(p.price)}</span>${hasSale ? ` <span class="price-old">${rub(Number(p.old_price))}</span>` : ''}</div>`;
     chip.addEventListener('click', () => selectPremium(i, chip));
     grid.appendChild(chip);
