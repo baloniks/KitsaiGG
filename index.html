@@ -1296,6 +1296,12 @@ const supabaseClient = (window.supabase && SUPABASE_URL.includes('YOUR_PROJECT_R
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+// Второй проект (Сингапур) — сюда переехала функция create-payment после
+// удаления одноимённой функции во Франкфурте. supabaseClient выше по-прежнему
+// смотрит на Франкфурт (баланс/заказы/профиль/промокоды/тикеты) — не трогаем.
+const SINGAPORE_URL = 'https://pcpqlxiplboolvaiwwui.supabase.co';
+const SINGAPORE_ANON_KEY = 'sb_publishable_pzbexxg2uNCbb-MjhDnFbQ_JMNmw0EE';
+
 // Реферальные ссылки. BOT_USERNAME — юзернейм бота без @.
 // MINIAPP_SHORT_NAME — короткое имя мини-аппа, которое вы задали в BotFather
 // при подключении Web App (/newapp или /myapps → Bot Settings → Menu Button /
@@ -3285,15 +3291,30 @@ async function startSBPPayment(){
   btn.classList.add('disabled');
 
   try {
-    const { data, error } = await supabaseClient.functions.invoke('create-payment', {
-      body: {
+    // create-payment теперь живёт в проекте "Сингапур" (Франкфурт больше её
+    // не отдаёт — там 404). Идём напрямую через fetch, а не через
+    // supabaseClient (тот привязан к Франкфурту и тут не подходит), по
+    // аналогии с тем, как ниже сделан вызов redeem-promo.
+    const resp = await fetch(`${SINGAPORE_URL}/functions/v1/create-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SINGAPORE_ANON_KEY}`,
+        'apikey': SINGAPORE_ANON_KEY
+      },
+      body: JSON.stringify({
         init_data: initData,
         amount: amount,
         description: 'Пополнение баланса KitsaiGG'
-      }
+      })
     });
 
-    if(error || !data?.success){
+    let data = null;
+    try { data = await resp.json(); } catch(parseErr){
+      console.error('create-payment: не удалось разобрать ответ', parseErr);
+    }
+
+    if(!resp.ok || !data?.success){
       throw new Error(data?.error || 'Payment failed');
     }
 
