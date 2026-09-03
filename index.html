@@ -594,6 +594,36 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
   ::-webkit-scrollbar{display:none;}
+
+  /* ---------- QR Modal (СБП) ---------- */
+  .qr-modal-overlay{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(5,6,10,.85); backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .qr-modal-overlay.show{opacity:1; pointer-events:all;}
+  .qr-modal{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius-lg); padding:24px 20px 20px;
+    max-width:320px; width:calc(100% - 32px); text-align:center;
+    box-shadow:var(--shadow-lift);
+    transform:translateY(16px); transition:transform .2s;
+  }
+  .qr-modal-overlay.show .qr-modal{transform:translateY(0);}
+  .qr-modal h3{font-family:var(--font-display); font-size:16px; margin-bottom:6px;}
+  .qr-modal p{font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:18px;}
+  .qr-modal img{
+    width:200px; height:200px; border-radius:var(--radius-sm);
+    border:4px solid #fff; display:block; margin:0 auto 18px;
+  }
+  .qr-modal-close{
+    width:100%; border:none; border-radius:var(--radius-sm);
+    background:var(--surface-3); color:var(--text);
+    font-size:14px; font-weight:600; padding:13px; cursor:pointer;
+    transition:filter .1s;
+  }
+  .qr-modal-close:active{filter:brightness(.9);}
 </style>
 </head>
 <body>
@@ -1226,7 +1256,7 @@
         <input type="number" id="topupCustom" placeholder="0 ₽">
       </div>
 
-      <button class="btn-primary disabled" id="topupBtn">Оплата временно недоступна</button>
+      <button class="btn-primary disabled" id="topupBtn">Выберите сумму</button>
     </section>
 
   </main>
@@ -1245,6 +1275,16 @@
   </nav>
 
   <div class="toast" id="toast"></div>
+
+  <!-- QR-код для СБП -->
+  <div class="qr-modal-overlay" id="qrModalOverlay">
+    <div class="qr-modal">
+      <h3>Оплата через СБП</h3>
+      <p>Отсканируйте QR-код камерой телефона или приложением банка</p>
+      <img id="qrModalImg" src="" alt="QR-код СБП">
+      <button class="qr-modal-close" id="qrModalClose">Закрыть</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -3194,22 +3234,40 @@ function selectTopupCustom(){
 
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
-  // Оплата временно скрыта — кнопка всегда неактивна, независимо от выбранной суммы.
-  btn.textContent = 'Оплата временно недоступна';
-  btn.classList.add('disabled');
+  if(state.topupAmount && state.topupAmount > 0){
+    btn.textContent = 'Пополнить баланс';
+    btn.classList.remove('disabled');
+  } else {
+    btn.textContent = 'Выберите сумму';
+    btn.classList.add('disabled');
+  }
 }
 
 function getTelegramInitData(){
   return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) || '';
 }
 
-async function startCryptoPayment(){
-  // Оплата через Crypto Bot временно скрыта/отключена.
-  showToast('Оплата временно недоступна');
-  return;
+/* Показываем QR-код СБП в модальном окне */
+function showQRModal(qrCodeDataUrl){
+  const overlay = document.getElementById('qrModalOverlay');
+  const img = document.getElementById('qrModalImg');
+  img.src = qrCodeDataUrl;
+  overlay.classList.add('show');
+}
 
-  if(!state.topupAmount) return;
-  const btn = document.getElementById('topupBtn');
+function hideQRModal(){
+  const overlay = document.getElementById('qrModalOverlay');
+  overlay.classList.remove('show');
+  document.getElementById('qrModalImg').src = '';
+}
+
+/* Оплата через СБП (Т-Банк) */
+async function startSBPPayment(){
+  const amount = state.topupAmount || 0;
+  if(amount <= 0){
+    showToast('Выберите сумму');
+    return;
+  }
 
   if(!supabaseClient){
     showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
@@ -3218,42 +3276,50 @@ async function startCryptoPayment(){
 
   const initData = getTelegramInitData();
   if(!initData){
-    showToast('Откройте приложение через Telegram-бота, чтобы пополнить баланс');
+    showToast('Откройте через Telegram');
     return;
   }
 
-  const prevText = btn.textContent;
-  btn.textContent = 'Создаём счёт...';
+  const btn = document.getElementById('topupBtn');
+  btn.textContent = 'Открываем платёж...';
   btn.classList.add('disabled');
 
   try {
-    const { data, error } = await supabaseClient.functions.invoke('create-invoice', {
+    const { data, error } = await supabaseClient.functions.invoke('create-payment', {
       body: {
-        amount_rub: state.topupAmount,
-        init_data: initData
+        init_data: initData,
+        amount: amount,
+        description: 'Пополнение баланса KitsaiGG'
       }
     });
 
-    if(error || !data || !data.pay_url){
-      throw new Error(error?.message || 'no pay_url in response');
+    if(error || !data?.success){
+      throw new Error(data?.error || 'Payment failed');
     }
 
-    // Открываем счёт Crypto Bot (мини-апп внутри Telegram или отдельная ссылка)
-    openExternalLink(data.pay_url);
-    showToast('Счёт создан — завершите оплату в Crypto Bot');
-
-    // Как только пользователь вернётся в приложение (после оплаты
-    // в CryptoBot), подтягиваем баланс заново.
-    watchForBalanceUpdate();
-
+    if(data.paymentURL){
+      // Ссылка на платёж — открываем через Telegram или браузер
+      openExternalLink(data.paymentURL);
+      showToast('Переходим к оплате…');
+      watchForBalanceUpdate();
+    } else if(data.qrCode){
+      // Показываем QR-код в модальном окне
+      showQRModal(data.qrCode);
+      watchForBalanceUpdate();
+    } else {
+      throw new Error('Ни ссылки, ни QR в ответе');
+    }
   } catch(e){
-    console.error('create-invoice error:', e);
-    showToast('Не удалось создать счёт. Попробуйте ещё раз');
+    console.error('Payment error:', e);
+    showToast('Не удалось открыть платёж');
   } finally {
-    btn.textContent = prevText;
+    btn.textContent = 'Пополнить баланс';
     btn.classList.remove('disabled');
   }
 }
+
+// Обратная совместимость — старый listener навешивается на startSBPPayment
+const startCryptoPayment = startSBPPayment;
 
 /* Обновляем баланс с сервера */
 async function loadBalance(){
@@ -3517,7 +3583,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Профиль и пополнение
   document.getElementById('btnProfileTopup').addEventListener('click', openTopup);
   document.getElementById('topupCustom').addEventListener('input', selectTopupCustom);
-  document.getElementById('topupBtn').addEventListener('click', startCryptoPayment);
+  document.getElementById('topupBtn').addEventListener('click', startSBPPayment);
+  document.getElementById('qrModalClose').addEventListener('click', hideQRModal);
+  document.getElementById('qrModalOverlay').addEventListener('click', (e) => {
+    if(e.target === e.currentTarget) hideQRModal();
+  });
 
   // Ссылки в профиле
   document.getElementById('linkSupport').addEventListener('click', () => pushView('support', {sub:true, title:'Поддержка'}));
