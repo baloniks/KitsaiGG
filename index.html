@@ -2005,7 +2005,11 @@ function openExternalLink(url) {
     tg.openLink(url);
     return;
   }
-  window.open(url, '_blank');
+  // Не window.open() — если вызов идёт после await (как при оплате), браузер
+  // к этому моменту уже не считает это прямым действием пользователя и тихо
+  // блокирует popup. Полный редирект текущей страницы попапом не считается
+  // и не блокируется никогда.
+  window.location.assign(url);
 }
 
 /* ---------------- CORE ROUTING (VIEW MANAGEMENT) ---------------- */
