@@ -3291,7 +3291,7 @@ async function startSBPPayment(){
   try {
     // Идём напрямую через fetch, а не через supabaseClient, по аналогии с
     // тем, как ниже сделан вызов redeem-promo.
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/tbank-init`, {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
