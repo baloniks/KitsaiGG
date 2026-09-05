@@ -1998,10 +1998,14 @@ async function loadReferralStats(){
 function openExternalLink(url) {
   const tg = window.Telegram && window.Telegram.WebApp;
 
-  // На Telegram Desktop / Web-клиентах tg.openLink() часто ничего не делает
-  // (известная особенность этих клиентов) — там сразу используем обычный
-  // редирект страницы, который работает везде без исключений.
-  const desktopPlatforms = ['tdesktop', 'macos', 'weba', 'webk'];
+  // Баг с неработающим tg.openLink() свойственен именно нативному
+  // десктоп-приложению Telegram (Windows/macOS/Linux), а не веб-версии.
+  // Веб-версия (weba/webk) рендерит мини-апп внутри iframe — там обязательно
+  // нужен tg.openLink(), который открывает настоящую новую вкладку. Если для
+  // неё тоже уйти на location.assign(), страница оплаты попытается
+  // открыться прямо в iframe и будет заблокирована его же X-Frame-Options —
+  // заказ создастся, а на экране будет пусто.
+  const desktopPlatforms = ['tdesktop', 'macos'];
   const isDesktopClient = tg && desktopPlatforms.includes(tg.platform);
 
   if (tg && url.includes('t.me') && typeof tg.openTelegramLink === 'function' && !isDesktopClient) {
@@ -3326,12 +3330,15 @@ async function startSBPPayment(){
     }
 
     if(data.paymentURL){
-      // Ссылка на платёж — открываем через Telegram или браузер
+      // Ссылка на платёж — открываем через Telegram или браузер.
+      // Поллинг тут не нужен: когда пользователь вернётся во вкладку,
+      // visibilitychange сам подтянет баланс одним запросом.
       openExternalLink(data.paymentURL);
       showToast('Переходим к оплате…');
-      watchForBalanceUpdate();
     } else if(data.qrCode){
-      // Показываем QR-код в модальном окне
+      // Показываем QR-код в модальном окне. Тут вкладку никто не покидает,
+      // поэтому visibilitychange не сработает — поллинг остаётся единственным
+      // способом узнать, что оплата прошла.
       showQRModal(data.qrCode);
       watchForBalanceUpdate();
     } else {
@@ -3389,20 +3396,30 @@ async function loadBalance(){
 
 /* После открытия счёта CryptoBot периодически проверяем баланс,
    пока пользователь не вернётся в мини-апп и оплата не подтвердится
-   вебхуком на сервере. */
+   вебхуком на сервере. Останавливаемся, как только баланс реально
+   изменится, — незачем достукивать все 20 вызовов get-profile, если
+   вебхук отработал уже на первой-второй попытке. */
 let balancePollTimer = null;
 function watchForBalanceUpdate(){
   clearInterval(balancePollTimer);
+  const balanceBefore = state.balance;
   let ticks = 0;
-  balancePollTimer = setInterval(() => {
+  balancePollTimer = setInterval(async () => {
     ticks++;
-    loadBalance();
-    if(ticks >= 20) clearInterval(balancePollTimer); // ~2 минуты
+    await loadBalance();
+    if(state.balance !== balanceBefore || ticks >= 10){
+      clearInterval(balancePollTimer); // баланс обновился, либо ждали максимум ~1 минуту
+    }
   }, 6000);
 }
 
+let lastBalanceCheckAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') loadBalance();
+  if(document.visibilityState !== 'visible') return;
+  const now = Date.now();
+  if(now - lastBalanceCheckAt < 4000) return; // не долбим сервер при частых переключениях
+  lastBalanceCheckAt = now;
+  loadBalance();
 });
 
 /* ---------------- ПРОМОКОДЫ ---------------- */
@@ -3552,18 +3569,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // чтобы не гадать, почему профиль пустой (частый случай на Desktop-клиенте)
         showToast('Telegram не передал данные профиля (id/ник). Обновите Telegram Desktop');
         console.warn('tgUser отсутствует — initDataUnsafe.user пуст. Возможно, устаревший клиент Telegram Desktop или мини-апп открыт вне бота.');
-      }
-    } catch(e) {}
-
-    // Если мини-апп открыт по диплинку из SuccessURL/FailURL (после оплаты
-    // СБП) — сразу сообщаем результат. loadBalance() ниже и так подтянет
-    // актуальный баланс при обычной загрузке.
-    try {
-      const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
-      if (startParam === 'topup_success') {
-        showToast('Оплата прошла успешно, баланс обновится через пару секунд');
-      } else if (startParam === 'topup_failed') {
-        showToast('Оплата не была завершена');
       }
     } catch(e) {}
   }
