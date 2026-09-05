@@ -3316,7 +3316,8 @@ async function startSBPPayment(){
       body: JSON.stringify({
         init_data: initData,
         amount: amount,
-        description: 'Пополнение баланса KitsaiGG'
+        description: 'Пополнение баланса KitsaiGG',
+        platform: (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.platform) || ''
       })
     });
 
@@ -3330,11 +3331,17 @@ async function startSBPPayment(){
     }
 
     if(data.paymentURL){
-      // Ссылка на платёж — открываем через Telegram или браузер.
-      // Поллинг тут не нужен: когда пользователь вернётся во вкладку,
-      // visibilitychange сам подтянет баланс одним запросом.
-      openExternalLink(data.paymentURL);
-      showToast('Переходим к оплате…');
+      if(data.deliveredViaBot){
+        // На десктопе tg.openLink() ненадёжен — ссылку уже отправили
+        // отдельным сообщением в чат с ботом с кнопкой "Оплатить".
+        showToast('Ссылка на оплату отправлена вам в чат с ботом');
+      } else {
+        // Ссылка на платёж — открываем через Telegram или браузер.
+        // Поллинг тут не нужен: когда пользователь вернётся во вкладку,
+        // visibilitychange сам подтянет баланс одним запросом.
+        openExternalLink(data.paymentURL);
+        showToast('Переходим к оплате…');
+      }
     } else if(data.qrCode){
       // Показываем QR-код в модальном окне. Тут вкладку никто не покидает,
       // поэтому visibilitychange не сработает — поллинг остаётся единственным
