@@ -3554,6 +3554,18 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('tgUser отсутствует — initDataUnsafe.user пуст. Возможно, устаревший клиент Telegram Desktop или мини-апп открыт вне бота.');
       }
     } catch(e) {}
+
+    // Если мини-апп открыт по диплинку из SuccessURL/FailURL (после оплаты
+    // СБП) — сразу сообщаем результат. loadBalance() ниже и так подтянет
+    // актуальный баланс при обычной загрузке.
+    try {
+      const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+      if (startParam === 'topup_success') {
+        showToast('Оплата прошла успешно, баланс обновится через пару секунд');
+      } else if (startParam === 'topup_failed') {
+        showToast('Оплата не была завершена');
+      }
+    } catch(e) {}
   }
 
   // Нижняя панель (Табы)
