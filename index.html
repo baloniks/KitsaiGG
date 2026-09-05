@@ -1299,8 +1299,6 @@ const supabaseClient = (window.supabase && SUPABASE_URL.includes('YOUR_PROJECT_R
 // Второй проект (Сингапур) — сюда переехала функция create-payment после
 // удаления одноимённой функции во Франкфурте. supabaseClient выше по-прежнему
 // смотрит на Франкфурт (баланс/заказы/профиль/промокоды/тикеты) — не трогаем.
-const SINGAPORE_URL = 'https://pcpqlxiplboolvaiwwui.supabase.co';
-const SINGAPORE_ANON_KEY = 'sb_publishable_pzbexxg2uNCbb-MjhDnFbQ_JMNmw0EE';
 
 // Реферальные ссылки. BOT_USERNAME — юзернейм бота без @.
 // MINIAPP_SHORT_NAME — короткое имя мини-аппа, которое вы задали в BotFather
@@ -3291,16 +3289,14 @@ async function startSBPPayment(){
   btn.classList.add('disabled');
 
   try {
-    // create-payment теперь живёт в проекте "Сингапур" (Франкфурт больше её
-    // не отдаёт — там 404). Идём напрямую через fetch, а не через
-    // supabaseClient (тот привязан к Франкфурту и тут не подходит), по
-    // аналогии с тем, как ниже сделан вызов redeem-promo.
-    const resp = await fetch(`${SINGAPORE_URL}/functions/v1/tbank-init`, {
+    // Идём напрямую через fetch, а не через supabaseClient, по аналогии с
+    // тем, как ниже сделан вызов redeem-promo.
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/tbank-init`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SINGAPORE_ANON_KEY}`,
-        'apikey': SINGAPORE_ANON_KEY
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY
       },
       body: JSON.stringify({
         init_data: initData,
