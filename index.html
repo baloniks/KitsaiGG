@@ -1997,11 +1997,18 @@ async function loadReferralStats(){
 
 function openExternalLink(url) {
   const tg = window.Telegram && window.Telegram.WebApp;
-  if (tg && url.includes('t.me') && typeof tg.openTelegramLink === 'function') {
+
+  // На Telegram Desktop / Web-клиентах tg.openLink() часто ничего не делает
+  // (известная особенность этих клиентов) — там сразу используем обычный
+  // редирект страницы, который работает везде без исключений.
+  const desktopPlatforms = ['tdesktop', 'macos', 'weba', 'webk'];
+  const isDesktopClient = tg && desktopPlatforms.includes(tg.platform);
+
+  if (tg && url.includes('t.me') && typeof tg.openTelegramLink === 'function' && !isDesktopClient) {
     tg.openTelegramLink(url);
     return;
   }
-  if (tg && typeof tg.openLink === 'function') {
+  if (tg && typeof tg.openLink === 'function' && !isDesktopClient) {
     tg.openLink(url);
     return;
   }
