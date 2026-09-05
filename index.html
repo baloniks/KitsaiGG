@@ -3316,8 +3316,7 @@ async function startSBPPayment(){
       body: JSON.stringify({
         init_data: initData,
         amount: amount,
-        description: 'Пополнение баланса KitsaiGG',
-        platform: (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.platform) || ''
+        description: 'Пополнение баланса KitsaiGG'
       })
     });
 
@@ -3331,15 +3330,14 @@ async function startSBPPayment(){
     }
 
     if(data.paymentURL){
+      // Всегда открываем ссылку сразу в мини-аппе.
+      openExternalLink(data.paymentURL);
+      // Бот параллельно присылает то же сообщение с кнопкой "Оплатить" —
+      // дублирует ссылку на случай если openExternalLink не сработал
+      // (десктоп, iframe) или пользователь захочет вернуться позже.
       if(data.deliveredViaBot){
-        // На десктопе tg.openLink() ненадёжен — ссылку уже отправили
-        // отдельным сообщением в чат с ботом с кнопкой "Оплатить".
-        showToast('Ссылка на оплату отправлена вам в чат с ботом');
+        showToast('Переходим к оплате… Ссылка также отправлена в бот');
       } else {
-        // Ссылка на платёж — открываем через Telegram или браузер.
-        // Поллинг тут не нужен: когда пользователь вернётся во вкладку,
-        // visibilitychange сам подтянет баланс одним запросом.
-        openExternalLink(data.paymentURL);
         showToast('Переходим к оплате…');
       }
     } else if(data.qrCode){
