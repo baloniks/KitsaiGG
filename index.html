@@ -1972,10 +1972,51 @@ function renderReferral(){
 }
 
 /* Подтягиваем статистику по рефералам с сервера */
-async function loadReferralStats(){
+// Кэш реферальной статистики — данные меняются только при покупках рефералов,
+// поэтому запрашиваем не чаще одного раза в 10 минут.
+const REFERRAL_STATS_CACHE_KEY = 'kitsaigg_referral_stats_cache';
+const REFERRAL_STATS_TTL_MS = 6 * 60 * 60 * 1000; // 6 часов
+
+function getReferralStatsCache() {
+  try {
+    const raw = localStorage.getItem(REFERRAL_STATS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts) return null;
+    if (Date.now() - parsed.ts > REFERRAL_STATS_TTL_MS) return null; // протух
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function setReferralStatsCache(count, earned) {
+  try {
+    localStorage.setItem(REFERRAL_STATS_CACHE_KEY, JSON.stringify({
+      ts: Date.now(),
+      count,
+      earned
+    }));
+  } catch {
+    // localStorage недоступен (встроенный браузер Telegram) — просто пропускаем
+  }
+}
+
+async function loadReferralStats({ force = false } = {}){
   if(!supabaseClient) return;
   const initData = getTelegramInitData();
   if(!initData) return;
+
+  // Если кэш свежий и принудительное обновление не запрошено — берём из кэша
+  if(!force){
+    const cached = getReferralStatsCache();
+    if(cached){
+      state.referral.count = cached.count;
+      state.referral.earned = cached.earned;
+      renderReferral();
+      return;
+    }
+  }
 
   try {
     const { data, error } = await supabaseClient.functions.invoke('get-referral-stats', {
@@ -1987,8 +2028,12 @@ async function loadReferralStats(){
       return;
     }
 
-    state.referral.count = Number(data?.referral_count) || 0;
-    state.referral.earned = Number(data?.kcoin_earned) || 0;
+    const count = Number(data?.referral_count) || 0;
+    const earned = Number(data?.kcoin_earned) || 0;
+
+    state.referral.count = count;
+    state.referral.earned = earned;
+    setReferralStatsCache(count, earned);
     renderReferral();
   } catch(e){
     console.error('get-referral-stats error:', e);
@@ -3316,7 +3361,8 @@ async function startSBPPayment(){
       body: JSON.stringify({
         init_data: initData,
         amount: amount,
-        description: 'Пополнение баланса KitsaiGG'
+        description: 'Пополнение баланса KitsaiGG',
+        platform: (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.platform) || ''
       })
     });
 
@@ -3330,14 +3376,15 @@ async function startSBPPayment(){
     }
 
     if(data.paymentURL){
-      // Всегда открываем ссылку сразу в мини-аппе.
-      openExternalLink(data.paymentURL);
-      // Бот параллельно присылает то же сообщение с кнопкой "Оплатить" —
-      // дублирует ссылку на случай если openExternalLink не сработал
-      // (десктоп, iframe) или пользователь захочет вернуться позже.
       if(data.deliveredViaBot){
-        showToast('Переходим к оплате… Ссылка также отправлена в бот');
+        // На десктопе tg.openLink() ненадёжен — ссылку уже отправили
+        // отдельным сообщением в чат с ботом с кнопкой "Оплатить".
+        showToast('Ссылка на оплату отправлена вам в чат с ботом');
       } else {
+        // Ссылка на платёж — открываем через Telegram или браузер.
+        // Поллинг тут не нужен: когда пользователь вернётся во вкладку,
+        // visibilitychange сам подтянет баланс одним запросом.
+        openExternalLink(data.paymentURL);
         showToast('Переходим к оплате…');
       }
     } else if(data.qrCode){
