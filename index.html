@@ -3295,7 +3295,7 @@ async function startSBPPayment(){
     // не отдаёт — там 404). Идём напрямую через fetch, а не через
     // supabaseClient (тот привязан к Франкфурту и тут не подходит), по
     // аналогии с тем, как ниже сделан вызов redeem-promo.
-    const resp = await fetch(`${SINGAPORE_URL}/functions/v1/create-payment`, {
+    const resp = await fetch(`${SINGAPORE_URL}/functions/v1/tbank-init`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
