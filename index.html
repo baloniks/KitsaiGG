@@ -1531,7 +1531,10 @@ let CATALOG_ITEMS = [];
 //   glyph         text   — эмодзи-иконка
 //   category      text   — 'games' | 'services' (верхнеуровневая категория)
 //   subcats       text[] — массив id подкатегорий (см. CATALOG_SUBCATEGORIES выше)
-//   price         numeric — фиксированная цена (только для type='list-item')
+//   price         numeric — для type='list-item': фиксированная цена;
+//                          для type='rate': необязательное переопределение
+//                          цены в каталоге (если NULL — считается как
+//                          мин. количество × rate, см. catalogItemPrice)
 //   unit          text    — единица измерения (только для type='rate', например '⭐')
 //   rate          numeric — цена за 1 единицу в рублях (только для type='rate')
 //   options       numeric[] — доступные объёмы для покупки (только для type='rate')
@@ -1652,7 +1655,12 @@ function buildProductConfigs(rows){
         // объект вида {"old_price": 1990} — тогда отображаемая цена "от" красится
         // в красный, а old_price показывается рядом зачёркнутым.
         saleOldPrice: (row.variants && !Array.isArray(row.variants) && row.variants.old_price != null)
-          ? Number(row.variants.old_price) : null
+          ? Number(row.variants.old_price) : null,
+        // Ручная цена в каталоге: если в колонке price у товара с type='rate'
+        // что-то указано — в каталоге показывается именно это число вместо
+        // автоматического расчёта (минимальное количество × rate). Оставьте
+        // price пустым (NULL), чтобы цена считалась по умолчанию.
+        overridePrice: row.price != null && row.price !== '' ? Number(row.price) : null
       };
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '', imageUrl: row.image_url || '',
@@ -1793,6 +1801,10 @@ function catalogItemPrice(entry){
   if(entry.type === 'rate'){
     const cfg = RATE_CONFIG[entry.key];
     if(!cfg) return 0;
+    // Ручная цена из колонки price (см. overridePrice в buildProductConfigs) —
+    // если она задана в Supabase, показываем её как есть и не пересчитываем.
+    if(cfg.overridePrice != null) return cfg.overridePrice;
+    // Иначе — автоматический расчёт по умолчанию.
     // Минимальное доступное количество: либо наименьший пресет из options,
     // либо min_qty (для товаров с input_mode='input', где options пустой),
     // либо большее из двух, если оба заданы — реальный минимум не может
