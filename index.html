@@ -500,6 +500,11 @@
   .topup-promo-banner p{font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:8px; position:relative; overflow-wrap:break-word; word-break:break-word;}
   .topup-promo-banner p:last-child{margin-bottom:0;}
   .topup-promo-banner .tpb-perks{font-size:11.5px; color:var(--accent-2); font-weight:600;}
+  .topup-promo-banner .tpb-cta{
+    margin-top:10px !important; padding:9px 12px; border-radius:var(--radius-sm);
+    background:rgba(96,146,250,.16); border:1px solid rgba(96,146,250,.4);
+    color:var(--text); font-weight:600; font-size:12.5px; text-align:center;
+  }
 
   /* ---------- Search bar ---------- */
   .search-bar{
@@ -656,9 +661,10 @@
 
       <div class="topup-promo-banner">
         <h4>💰 Пополняйте баланс KitsaiGG в рублях!</h4>
-        <p>У нас доступно пополнение через СБП - поможем найти выгодный курс обмена и зачислим средства на ваш баланс.</p>
+        <p>У нас доступно пополнение через СБП — поможем найти выгодный курс обмена и зачислим средства на ваш баланс.</p>
         <p class="tpb-perks">⚡ Быстро • 💳 Удобно • 💰 Выгодный курс</p>
         <p>Пополнение доступно на любую сумму.</p>
+        <p class="tpb-cta">🎫 Для пополнения создайте тикет с темой «Пополнить баланс».</p>
       </div>
 
       <div class="search-bar">
@@ -911,7 +917,7 @@
       </div>
       <div class="note-box">
         💬 Telegram - хотите задать вопрос лично, подробно описать проблему с заказом или отправить скриншот.<br>
-        🎫 Тикет - если неверно указали данные аккаунта, заказ не пришёл, нашли баг или у вас спам-бан.
+        🎫 Тикет - если вам нужно пополнить баланс, неверно указали данные аккаунта, заказ не пришёл, нашли баг или у вас спам-бан.
       </div>
       <button class="btn-primary" id="btnTgSupport">Написать в чат</button>
       <button class="btn-secondary" id="btnGoTicket">Создать тикет</button>
@@ -923,10 +929,10 @@
       <div class="field" style="margin-top:0;">
         <label>Тема обращения</label>
         <select id="ticketTopic" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-mono); font-size:13px;">
+          <option>Пополнение баланса</option>
           <option>Заказ не пришёл</option>
           <option>Проблема с оплатой</option>
           <option>Вопрос по промокоду</option>
-          <option>Пополнение баланса</option>
           <option>Другое</option>
         </select>
       </div>
