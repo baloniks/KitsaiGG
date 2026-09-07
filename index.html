@@ -2358,7 +2358,7 @@ function updateRateSummary(){
   if(state.rateSelected == null){
     document.getElementById('rateQtyVal').textContent = '—';
     document.getElementById('rateTotalVal').textContent = '— $';
-    if(totalSubEl) totalSubEl.textContent = '—₽';
+    if(totalSubEl) totalSubEl.textContent = '— ₽';
     btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
@@ -2443,7 +2443,7 @@ function updatePremiumSummary(){
   if(state.premiumSelected == null){
     document.getElementById('premiumPlanVal').textContent = '—';
     document.getElementById('premiumTotalVal').textContent = '— $';
-    if(totalSubEl) totalSubEl.textContent = '—₽';
+    if(totalSubEl) totalSubEl.textContent = '— ₽';
     btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
@@ -2804,7 +2804,7 @@ function updateItemSummary(){
   // Под "Итого" в $ — та же сумма (unitPrice * qty), но в ₽ (мелким шрифтом),
   // без округления, тот же приоритет полей, что и variantPrice выше.
   const totalSubEl = document.getElementById('itemTotalSub');
-  if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `${fmtNum(unitPrice * state.itemQty)}₽` : '—₽';
+  if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `${fmtNum(unitPrice * state.itemQty)}₽` : '— ₽';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 
