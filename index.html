@@ -1468,7 +1468,11 @@ let CATALOG_ITEMS = [];
 //                          цены в каталоге (если NULL — считается как
 //                          мин. количество × rate, см. catalogItemPrice)
 //   unit          text    — единица измерения (только для type='rate', например '⭐')
-//   rate          numeric — цена за 1 единицу в рублях (только для type='rate')
+//   rate          numeric — цена за 1 единицу (только для type='rate'); если
+//                          у товара также заполнена колонка rate_usd (или
+//                          price_usd), используется она — см. функцию
+//                          variantPrice и tiers ниже, rate остаётся
+//                          резервным/старым вариантом
 //   options       numeric[] — доступные объёмы для покупки (только для type='rate')
 //   field_label   text    — подпись поля получателя (только для type='rate')
 //   hint          text    — подсказка под полем получателя; для type='rate' —
@@ -1542,7 +1546,10 @@ function buildProductConfigs(rows){
     if(row.type === 'rate'){
       RATE_CONFIG[row.id] = {
         title: row.title,
-        rate: Number(row.rate) || 0,
+        // Приоритет: rate_usd -> price_usd -> rate (см. variantPrice) — так
+        // цена за 1 единицу может быть задана в долларах отдельной колонкой
+        // rate_usd, а rate остаётся рублёвым резервным вариантом.
+        rate: variantPrice(row, 'rate'),
         unit: row.unit || '',
         glyph: row.glyph || '',
         // Категория товара из Supabase ('games' | 'services') — источник
@@ -1601,15 +1608,21 @@ function buildProductConfigs(rows){
         // price пустым (NULL), чтобы цена считалась по умолчанию.
         overridePrice: row.price != null && row.price !== '' ? Number(row.price) : null,
         // Ступенчатые цены (оптовые скидки): если в колонке variants записан
-        // МАССИВ вида [{"min_qty":2,"rate":32.5},{"min_qty":10,"rate":29}] —
-        // цена за 1 единицу берётся из тарифа с наибольшим min_qty, который
-        // не превышает выбранное количество. Если массив не задан (variants
-        // пуст/объект-акция) — всегда используется обычный rate.
+        // МАССИВ вида [{"min_qty":2,"rate":32.5,"rate_usd":0.36},{"min_qty":10,
+        // "rate":29,"rate_usd":0.32}] — цена за 1 единицу берётся из тарифа с
+        // наибольшим min_qty, который не превышает выбранное количество;
+        // приоритет полей тот же, что и у variantPrice: rate_usd -> price_usd
+        // -> rate. Если массив не задан (variants пуст/объект-акция) —
+        // всегда используется обычный rate (тоже с приоритетом rate_usd).
         // Сортируем по возрастанию min_qty, чтобы искать снизу вверх.
         tiers: Array.isArray(row.variants)
           ? row.variants
               .filter(t => t && t.min_qty != null && t.rate != null)
-              .map(t => ({ minQty: Number(t.min_qty), rate: Number(t.rate) }))
+              // Приоритет: rate_usd -> price_usd -> rate (см. variantPrice) —
+              // раньше здесь всегда брался только t.rate (рубли), из-за чего
+              // rate_usd у ступенчатых тарифов игнорировался и цена не
+              // переключалась на доллары.
+              .map(t => ({ minQty: Number(t.min_qty), rate: variantPrice(t, 'rate') }))
               .sort((a, b) => a.minQty - b.minQty)
           : null
       };
@@ -1852,14 +1865,17 @@ function renderPriceCell(currentLabel, sale){
 const rub = n => n.toLocaleString('ru-RU') + ' 💲';
 
 // Возвращает цену конкретного номинала/тарифа (одного объекта внутри
-// массива variants в таблице products в Supabase). Приоритет полей:
-// rate_usd -> price_usd -> price (последнее — для обратной совместимости
-// со старыми записями, где ещё нет rate_usd/price_usd).
-function variantPrice(v){
+// массива variants в таблице products в Supabase, либо самой строки товара
+// для базовой ставки type='rate'). Приоритет полей: rate_usd -> price_usd ->
+// fallbackField (по умолчанию 'price'; для базовой ставки и ступенчатых
+// тарифов передаём 'rate' — см. использование в buildProductConfigs). Такой
+// приоритет и есть обратная совместимость со старыми записями, где ещё нет
+// rate_usd/price_usd.
+function variantPrice(v, fallbackField){
   if(!v) return 0;
   if(v.rate_usd != null && v.rate_usd !== '') return Number(v.rate_usd) || 0;
   if(v.price_usd != null && v.price_usd !== '') return Number(v.price_usd) || 0;
-  return Number(v.price) || 0;
+  return Number(v[fallbackField || 'price']) || 0;
 }
 
 // Список допустимых значений колонки username_format (text[]) в таблице
