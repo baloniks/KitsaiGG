@@ -594,36 +594,6 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
   ::-webkit-scrollbar{display:none;}
-
-  /* ---------- QR Modal (СБП) ---------- */
-  .qr-modal-overlay{
-    position:fixed; inset:0; z-index:100;
-    background:rgba(5,6,10,.85); backdrop-filter:blur(8px);
-    display:flex; align-items:center; justify-content:center;
-    opacity:0; pointer-events:none; transition:opacity .2s;
-  }
-  .qr-modal-overlay.show{opacity:1; pointer-events:all;}
-  .qr-modal{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:var(--radius-lg); padding:24px 20px 20px;
-    max-width:320px; width:calc(100% - 32px); text-align:center;
-    box-shadow:var(--shadow-lift);
-    transform:translateY(16px); transition:transform .2s;
-  }
-  .qr-modal-overlay.show .qr-modal{transform:translateY(0);}
-  .qr-modal h3{font-family:var(--font-display); font-size:16px; margin-bottom:6px;}
-  .qr-modal p{font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:18px;}
-  .qr-modal img{
-    width:200px; height:200px; border-radius:var(--radius-sm);
-    border:4px solid #fff; display:block; margin:0 auto 18px;
-  }
-  .qr-modal-close{
-    width:100%; border:none; border-radius:var(--radius-sm);
-    background:var(--surface-3); color:var(--text);
-    font-size:14px; font-weight:600; padding:13px; cursor:pointer;
-    transition:filter .1s;
-  }
-  .qr-modal-close:active{filter:brightness(.9);}
 </style>
 </head>
 <body>
@@ -1249,16 +1219,6 @@
   </nav>
 
   <div class="toast" id="toast"></div>
-
-  <!-- QR-код для СБП -->
-  <div class="qr-modal-overlay" id="qrModalOverlay">
-    <div class="qr-modal">
-      <h3>Оплата через СБП</h3>
-      <p>Отсканируйте QR-код камерой телефона или приложением банка</p>
-      <img id="qrModalImg" src="" alt="QR-код СБП">
-      <button class="qr-modal-close" id="qrModalClose">Закрыть</button>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -1269,10 +1229,6 @@ const SUPABASE_ANON_KEY = 'sb_publishable_H93rZs5we8bkNvr6WAKHzw_3dfZT6RR';
 const supabaseClient = (window.supabase && SUPABASE_URL.includes('YOUR_PROJECT_REF') === false)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
-
-// Второй проект (Сингапур) — сюда переехала функция create-payment после
-// удаления одноимённой функции во Франкфурте. supabaseClient выше по-прежнему
-// смотрит на Франкфурт (баланс/заказы/профиль/промокоды/тикеты) — не трогаем.
 
 // Реферальные ссылки. BOT_USERNAME — юзернейм бота без @.
 // MINIAPP_SHORT_NAME — короткое имя мини-аппа, которое вы задали в BotFather
@@ -3339,103 +3295,6 @@ function getTelegramInitData(){
   return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) || '';
 }
 
-/* Показываем QR-код СБП в модальном окне */
-function showQRModal(qrCodeDataUrl){
-  const overlay = document.getElementById('qrModalOverlay');
-  const img = document.getElementById('qrModalImg');
-  img.src = qrCodeDataUrl;
-  overlay.classList.add('show');
-}
-
-function hideQRModal(){
-  const overlay = document.getElementById('qrModalOverlay');
-  overlay.classList.remove('show');
-  document.getElementById('qrModalImg').src = '';
-}
-
-/* Оплата через СБП (Т-Банк) */
-async function startSBPPayment(){
-  const amount = state.topupAmount || 0;
-  if(amount <= 0){
-    showToast('Выберите сумму');
-    return;
-  }
-
-  if(!supabaseClient){
-    showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
-    return;
-  }
-
-  const initData = getTelegramInitData();
-  if(!initData){
-    showToast('Откройте через Telegram');
-    return;
-  }
-
-  const btn = document.getElementById('topupBtn');
-  btn.textContent = 'Открываем платёж...';
-  btn.classList.add('disabled');
-
-  try {
-    // Идём напрямую через fetch, а не через supabaseClient, по аналогии с
-    // тем, как ниже сделан вызов redeem-promo.
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-payment`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY
-      },
-      body: JSON.stringify({
-        init_data: initData,
-        amount: amount,
-        description: 'Пополнение баланса KitsaiGG',
-        platform: (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.platform) || ''
-      })
-    });
-
-    let data = null;
-    try { data = await resp.json(); } catch(parseErr){
-      console.error('create-payment: не удалось разобрать ответ', parseErr);
-    }
-
-    if(!resp.ok || !data?.success){
-      throw new Error(data?.error || 'Payment failed');
-    }
-
-    if(data.paymentURL){
-      if(data.deliveredViaBot){
-        // На десктопе tg.openLink() ненадёжен — ссылку уже отправили
-        // отдельным сообщением в чат с ботом с кнопкой "Оплатить".
-        showToast('Ссылка на оплату отправлена вам в чат с ботом');
-      } else {
-        // Ссылка на платёж — открываем через Telegram или браузер.
-        // Поллинг тут не нужен: когда пользователь вернётся во вкладку,
-        // visibilitychange сам подтянет баланс одним запросом.
-        openExternalLink(data.paymentURL);
-        showToast('Переходим к оплате…');
-      }
-    } else if(data.qrCode){
-      // Показываем QR-код в модальном окне. Тут вкладку никто не покидает,
-      // поэтому visibilitychange не сработает — поллинг остаётся единственным
-      // способом узнать, что оплата прошла.
-      showQRModal(data.qrCode);
-      watchForBalanceUpdate();
-    } else {
-      throw new Error('Ни ссылки, ни QR в ответе');
-    }
-  } catch(e){
-    console.error('Payment error:', e);
-    showToast('Не удалось открыть платёж');
-  } finally {
-    btn.textContent = 'Пополнить баланс';
-    btn.classList.remove('disabled');
-  }
-}
-
-// Обратная совместимость — старый listener навешивается на startSBPPayment
-const startCryptoPayment = startSBPPayment;
-
 /* Обновляем баланс с сервера */
 async function loadBalance(){
   if(!supabaseClient) return;
@@ -3708,11 +3567,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Профиль и пополнение
   document.getElementById('btnProfileTopup').addEventListener('click', openTopup);
   document.getElementById('topupCustom').addEventListener('input', selectTopupCustom);
-  document.getElementById('topupBtn').addEventListener('click', startSBPPayment);
-  document.getElementById('qrModalClose').addEventListener('click', hideQRModal);
-  document.getElementById('qrModalOverlay').addEventListener('click', (e) => {
-    if(e.target === e.currentTarget) hideQRModal();
-  });
+  document.getElementById('topupBtn').addEventListener('click', () => showToast('Пополнение временно недоступно'));
 
   // Ссылки в профиле
   document.getElementById('linkSupport').addEventListener('click', () => pushView('support', {sub:true, title:'Поддержка'}));
