@@ -609,7 +609,7 @@
       </div>
     </div>
     <div class="balance-chip" id="btnHeaderBalance">
-      <span class="val" id="balanceTop">0 ₽</span>
+      <span class="val" id="balanceTop">0 💲</span>
       <span class="plus">+</span>
     </div>
   </div>
@@ -680,7 +680,7 @@
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
-        <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— ₽</span></div>
+        <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— 💲</span></div>
       </div>
       <label class="consent-row" id="rateConsentWrap">
         <input type="checkbox" id="rateConsent">
@@ -711,7 +711,7 @@
       <div class="hint" id="premiumHint">Активация без пароля и без кода подтверждения.</div>
       <div class="order-bar">
         <div class="row"><span id="premiumPlanLabel">Подписка</span><span id="premiumPlanVal">—</span></div>
-        <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— ₽</span></div>
+        <div class="total"><span class="lbl">Итого</span><span class="val" id="premiumTotalVal">— 💲</span></div>
       </div>
       <label class="consent-row" id="premiumConsentWrap">
         <input type="checkbox" id="premiumConsent">
@@ -761,7 +761,7 @@
       </div>
       <div class="order-bar">
         <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
-        <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— ₽</span></div>
+        <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— 💲</span></div>
       </div>
       <label class="consent-row" id="itemConsentWrap">
         <input type="checkbox" id="itemConsent">
@@ -844,7 +844,7 @@
 
       <div class="balance-card">
         <div class="lbl">Доступный баланс</div>
-        <div class="val" id="balanceProfile">0 ₽</div>
+        <div class="val" id="balanceProfile">0 💲</div>
         <div class="lbl" style="margin-top:8px;">Кэшбек KCoin</div>
         <div class="val" id="kcoinVal" style="font-size:16px;">0 KC</div>
         <button class="btn-primary" style="margin-top:0;" id="btnProfileTopup">Пополнить баланс</button>
@@ -860,7 +860,7 @@
         <p>Приглашайте друзей и получайте 1% с каждой их покупки — начисляется автоматически.</p>
         <div class="ref-stats">
           <div class="ref-stat"><div class="n" id="refCount">0</div><div class="l">рефералов</div></div>
-          <div class="ref-stat"><div class="n" id="refEarned">0 ₽</div><div class="l">заработано</div></div>
+          <div class="ref-stat"><div class="n" id="refEarned">0 💲</div><div class="l">заработано</div></div>
         </div>
         <div class="ref-link-row">
           <span id="refLinkText">Загрузка...</span>
@@ -1196,8 +1196,8 @@
       <div class="section-label" style="margin-top:0;">Сумма пополнения</div>
       <div class="chip-grid" id="topupChips"></div>
       <div class="field">
-        <label>Или введите свою сумму (₽)</label>
-        <input type="number" id="topupCustom" placeholder="0 ₽">
+        <label>Или введите свою сумму (💲)</label>
+        <input type="number" id="topupCustom" placeholder="0 💲">
       </div>
 
       <button class="btn-primary disabled" id="topupBtn">Выберите сумму</button>
@@ -1805,7 +1805,7 @@ function catalogItemPriceLabel(entry){
 // красная текущая) — но ТОЛЬКО для товаров с одной ценой (variants — объект-пометка
 // {old_price}, а не массив номиналов). Если у товара несколько номиналов/тарифов
 // (variants — массив), акция во внешнем списке (каталог/категория) НЕ показывается —
-// список остаётся обычным ("от X ₽"), а красная цена + зачёркивание видны только
+// список остаётся обычным ("от X 💲"), а красная цена + зачёркивание видны только
 // внутри самого товара, на конкретном номинале/чипе (см. рендер чипов ниже).
 function listItemSale(item){
   return (item.saleOldPrice != null) ? { oldPrice: item.saleOldPrice, price: item.price } : null;
@@ -1843,7 +1843,7 @@ function renderPriceCell(currentLabel, sale){
 }
 
 /* ---------------- HELPERS ---------------- */
-const rub = n => n.toLocaleString('ru-RU') + ' ₽';
+const rub = n => n.toLocaleString('ru-RU') + ' 💲';
 
 // Список допустимых значений колонки username_format (text[]) в таблице
 // products. Любые прочие/неизвестные значения из массива отбрасываются.
@@ -1926,7 +1926,7 @@ function renderBalance(){
 
 function renderReferral(){
   document.getElementById('refCount').textContent = state.referral.count;
-  // Бонус реферера начисляется в KCoin, а не в рублях — не показываем как ₽
+  // Бонус реферера начисляется в KCoin, а не в рублях — не показываем как 💲
   document.getElementById('refEarned').textContent = state.referral.earned.toLocaleString('ru-RU') + ' KC';
 
   const linkEl = document.getElementById('refLinkText');
@@ -2191,13 +2191,13 @@ function renderRateProduct(cat){
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
   document.getElementById('rateRateVal').textContent = cfg.tiers && cfg.tiers.length
     // Есть ступенчатые тарифы — показываем все пороги вместо одной цены,
-    // например: "2-9 шт: 32.50 ₽ · от 10 шт: 29.00 ₽".
+    // например: "2-9 шт: 32.50 💲 · от 10 шт: 29.00 💲".
     ? cfg.tiers.map((t, i) => {
         const next = cfg.tiers[i + 1];
         const range = next ? (t.minQty + '-' + (next.minQty - 1) + ' ' + cfg.unit) : ('от ' + t.minQty + ' ' + cfg.unit);
-        return range + ': ' + t.rate.toFixed(2) + ' ₽';
+        return range + ': ' + t.rate.toFixed(2) + ' 💲';
       }).join(' · ')
-    : '1 ' + cfg.unit + ' ≈ ' + cfg.rate.toFixed(2) + ' ₽';
+    : '1 ' + cfg.unit + ' ≈ ' + cfg.rate.toFixed(2) + ' 💲';
 
   const grid = document.getElementById('rateChips');
   grid.innerHTML = '';
@@ -2288,7 +2288,7 @@ function updateRateSummary(){
   const btn = document.getElementById('rateBuyBtn');
   if(state.rateSelected == null){
     document.getElementById('rateQtyVal').textContent = '—';
-    document.getElementById('rateTotalVal').textContent = '— ₽';
+    document.getElementById('rateTotalVal').textContent = '— 💲';
     btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
@@ -2364,7 +2364,7 @@ function updatePremiumSummary(){
   const cfg = MORE_ITEM_CONFIG[state.currentCategory];
   if(state.premiumSelected == null){
     document.getElementById('premiumPlanVal').textContent = '—';
-    document.getElementById('premiumTotalVal').textContent = '— ₽';
+    document.getElementById('premiumTotalVal').textContent = '— 💲';
     btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
@@ -2714,7 +2714,7 @@ function updateItemSummary(){
   document.getElementById('itemQty').textContent = state.itemQty;
   const unitPriceEl = document.getElementById('itemUnitPrice');
   unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
-  document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— ₽';
+  document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— 💲';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 
@@ -3256,7 +3256,7 @@ function renderTopupChips(){
   TOPUP_AMOUNTS.forEach(a => {
     const chip = document.createElement('div');
     chip.className = 'chip';
-    chip.innerHTML = `<div class="amt">${a.toLocaleString('ru-RU')} ₽</div>`;
+    chip.innerHTML = `<div class="amt">${a.toLocaleString('ru-RU')} 💲</div>`;
     chip.addEventListener('click', () => { 
       state.topupAmount = a; 
       document.getElementById('topupCustom').value = ''; 
