@@ -1762,6 +1762,12 @@ async function loadProducts(){
 
 // Возвращает цену за 1 единицу для конкретного количества qty, с учётом
 // ступенчатых тарифов (cfg.tiers). Если тарифов нет — просто cfg.rate.
+// Округляем только до центов (2 знака после запятой), чтобы убрать погрешности
+// плавающей точки (0.1+0.2 и т.п.), но НЕ округлять сумму до целого доллара —
+// цена товара должна совпадать с тем, что задано (rate * qty), без искажений.
+function round2(n){
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
 function rateForQty(cfg, qty){
   if(!cfg.tiers || !cfg.tiers.length) return cfg.rate;
   let result = cfg.tiers[0].rate;
@@ -1787,7 +1793,7 @@ function catalogItemPrice(entry){
     let baseQty = cfg.options && cfg.options.length ? Math.min(...cfg.options) : null;
     if(cfg.minQty != null) baseQty = baseQty != null ? Math.max(baseQty, cfg.minQty) : cfg.minQty;
     if(baseQty == null) baseQty = 1;
-    return Math.round(baseQty * rateForQty(cfg, baseQty));
+    return round2(baseQty * rateForQty(cfg, baseQty));
   }
   if(entry.type === 'more-item'){
     const cfg = MORE_ITEM_CONFIG[entry.key];
@@ -2257,7 +2263,7 @@ function renderRateProduct(cat){
   cfg.options
     .filter(opt => !cfg.maxQty || opt <= cfg.maxQty)
     .forEach(opt => {
-    const price = Math.round(opt * rateForQty(cfg, opt));
+    const price = round2(opt * rateForQty(cfg, opt));
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${opt.toLocaleString('ru-RU')} ${cfg.unit}</div><div class="sub">${rub(price)}</div>`;
@@ -2326,7 +2332,7 @@ function updateRateSummary(){
     btn.classList.add('disabled');
     return;
   }
-  const total = Math.round(state.rateSelected * rateForQty(cfg, state.rateSelected));
+  const total = round2(state.rateSelected * rateForQty(cfg, state.rateSelected));
   document.getElementById('rateQtyVal').textContent = state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit;
   document.getElementById('rateTotalVal').textContent = rub(total);
   btn.textContent = 'Купить за ' + rub(total);
@@ -2815,7 +2821,7 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
-    const total = Math.round(state.rateSelected * rateForQty(cfg, state.rateSelected));
+    const total = round2(state.rateSelected * rateForQty(cfg, state.rateSelected));
     purchase = {
       cat: orderCategoryFromProduct(cfg.category, RATE_ORDER_CAT[state.currentCategory] || 'game'), glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
