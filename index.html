@@ -1480,7 +1480,11 @@ let CATALOG_ITEMS = [];
 //                          (по умолчанию "Подписка", можно поставить "Тариф" и т.п.)
 //   variants      jsonb   — если МАССИВ {label, price[, ...]}: для type='more-item' —
 //                          тарифы/планы (label, months, price), для type='list-item' —
-//                          номиналы/варианты товара (label, price). Любой объект внутри
+//                          номиналы/варианты товара (label, price). Цена каждого
+//                          варианта берётся по приоритету: rate_usd -> price_usd ->
+//                          price (см. функцию variantPrice) — так что можно указывать
+//                          цену варианта в поле rate_usd или price_usd, а price
+//                          оставить как старый/резервный вариант. Любой объект внутри
 //                          такого массива может дополнительно содержать old_price —
 //                          тогда именно у этого варианта/тарифа цена красится в красный,
 //                          а old_price показывается рядом зачёркнутым (см. ниже).
@@ -1774,7 +1778,7 @@ function catalogItemPrice(entry){
   }
   if(entry.type === 'more-item'){
     const cfg = MORE_ITEM_CONFIG[entry.key];
-    return cfg && cfg.plans.length ? Math.min(...cfg.plans.map(p => Number(p.price) || 0)) : 0;
+    return cfg && cfg.plans.length ? Math.min(...cfg.plans.map(p => variantPrice(p))) : 0;
   }
   if(entry.type === 'list-item'){
     const item = LIST_CONFIG[entry.listKey]?.items.find(i => i.id === entry.itemId);
@@ -1782,7 +1786,7 @@ function catalogItemPrice(entry){
     // Если у товара несколько номиналов (variants), собственного price у него
     // может не быть (price=null в базе) — тогда берём минимальную цену из вариантов.
     if(item.variants && item.variants.length){
-      return Math.min(...item.variants.map(v => Number(v.price) || 0));
+      return Math.min(...item.variants.map(v => variantPrice(v)));
     }
     return item.price;
   }
@@ -1816,7 +1820,7 @@ function listItemPriceLabel(item){
   const sale = listItemSale(item);
   if(sale) return rub(sale.price);
   if(item.variants && item.variants.length){
-    const minPrice = Math.min(...item.variants.map(v => Number(v.price) || 0));
+    const minPrice = Math.min(...item.variants.map(v => variantPrice(v)));
     return 'от ' + rub(minPrice);
   }
   return rub(item.price);
@@ -1846,6 +1850,17 @@ function renderPriceCell(currentLabel, sale){
 
 /* ---------------- HELPERS ---------------- */
 const rub = n => n.toLocaleString('ru-RU') + ' 💲';
+
+// Возвращает цену конкретного номинала/тарифа (одного объекта внутри
+// массива variants в таблице products в Supabase). Приоритет полей:
+// rate_usd -> price_usd -> price (последнее — для обратной совместимости
+// со старыми записями, где ещё нет rate_usd/price_usd).
+function variantPrice(v){
+  if(!v) return 0;
+  if(v.rate_usd != null && v.rate_usd !== '') return Number(v.rate_usd) || 0;
+  if(v.price_usd != null && v.price_usd !== '') return Number(v.price_usd) || 0;
+  return Number(v.price) || 0;
+}
 
 // Список допустимых значений колонки username_format (text[]) в таблице
 // products. Любые прочие/неизвестные значения из массива отбрасываются.
@@ -2347,7 +2362,7 @@ function renderPremiumProduct(id){
     const isLong = String(p.label || '').length > 16;
     chip.innerHTML = `
       <div class="amt${isLong ? ' long' : ''}">${p.label}</div>
-      <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(p.price)}</span>${hasSale ? ` <span class="price-old">${rub(Number(p.old_price))}</span>` : ''}</div>`;
+      <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(variantPrice(p))}</span>${hasSale ? ` <span class="price-old">${rub(Number(p.old_price))}</span>` : ''}</div>`;
     chip.addEventListener('click', () => selectPremium(i, chip));
     grid.appendChild(chip);
   });
@@ -2373,8 +2388,8 @@ function updatePremiumSummary(){
   }
   const plan = cfg.plans[state.premiumSelected];
   document.getElementById('premiumPlanVal').textContent = plan.label;
-  document.getElementById('premiumTotalVal').textContent = rub(plan.price);
-  btn.textContent = 'Купить за ' + rub(plan.price);
+  document.getElementById('premiumTotalVal').textContent = rub(variantPrice(plan));
+  btn.textContent = 'Купить за ' + rub(variantPrice(plan));
   if(document.getElementById('premiumConsent').checked){
     btn.classList.remove('disabled');
   } else {
@@ -2665,7 +2680,7 @@ function renderItemDetail(item){
       const hasSale = v.old_price != null;
       chip.innerHTML = `
         <div class="amt">${v.label}</div>
-        <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(Number(v.price) || 0)}</span>${hasSale ? ` <span class="price-old">${rub(Number(v.old_price))}</span>` : ''}</div>`;
+        <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(variantPrice(v))}</span>${hasSale ? ` <span class="price-old">${rub(Number(v.old_price))}</span>` : ''}</div>`;
       chip.addEventListener('click', () => selectItemVariant(i, chip));
       variantGrid.appendChild(chip);
     });
@@ -2706,7 +2721,7 @@ function updateItemSummary(){
   const selectedVariant = hasVariants && state.itemVariantSelected != null
     ? item.variants[state.itemVariantSelected]
     : null;
-  const unitPrice = hasVariants ? (selectedVariant ? Number(selectedVariant.price) || 0 : null) : item.price;
+  const unitPrice = hasVariants ? (selectedVariant ? variantPrice(selectedVariant) : null) : item.price;
   // Акция (old_price) — у выбранного номинала, либо у самого товара, если у него
   // нет номиналов (variants — объект-пометка, см. saleOldPrice).
   const saleOldPrice = hasVariants
@@ -2717,7 +2732,8 @@ function updateItemSummary(){
   const unitPriceEl = document.getElementById('itemUnitPrice');
   unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
   document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— 💲';
-  // Мелкая подпись под "Итого": +-X₽, где X — цена варианта (variants[].price) из Supabase.
+  // Мелкая подпись под "Итого": +-X₽, где X — цена варианта (variants[].rate_usd
+  // или variants[].price_usd, а если их нет — variants[].price) из Supabase.
   const totalSubEl = document.getElementById('itemTotalSub');
   if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `+-${unitPrice.toLocaleString('ru-RU')}₽` : '';
   const plusBtn = document.getElementById('btnQtyPlus');
@@ -2818,7 +2834,7 @@ function attemptBuy(type){
     const plan = moreItemCfg.plans[state.premiumSelected];
     purchase = {
       cat: orderCategoryFromProduct(moreItemCfg.category, MORE_ITEM_ORDER_CAT[state.currentCategory] || 'services'), glyph: moreItemCfg.glyph || '💎', title: moreItemCfg.title + ' · ' + plan.label,
-      recipient: username, recipient2: username2, field2Label: moreItemCfg.fieldLabel2, price: plan.price,
+      recipient: username, recipient2: username2, field2Label: moreItemCfg.fieldLabel2, price: variantPrice(plan),
       product_id: state.currentCategory,
       plan_index: state.premiumSelected
     };
@@ -2845,7 +2861,7 @@ function attemptBuy(type){
       }
     }
     const variant = item.variants ? item.variants[state.itemVariantSelected] : null;
-    const unitPrice = variant ? Number(variant.price) || 0 : item.price;
+    const unitPrice = variant ? variantPrice(variant) : item.price;
     purchase = {
       cat:'key', glyph:item.glyph,
       title: item.title + (variant ? ' · ' + variant.label : '') + (state.itemQty>1 ? ' × '+state.itemQty : ''),
