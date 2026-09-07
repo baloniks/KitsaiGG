@@ -506,6 +506,22 @@
     color:var(--text); font-weight:600; font-size:12.5px; text-align:center;
   }
 
+  .rate-badge{
+    display:flex; align-items:center; gap:10px; margin:0 0 14px; padding:12px 14px;
+    border-radius:var(--radius-lg); position:relative; overflow:hidden;
+    background:linear-gradient(155deg, rgba(255,196,74,.16), rgba(23,26,33,.65) 60%);
+    border:1px solid rgba(255,196,74,.35);
+    box-shadow:var(--shadow-card);
+  }
+  .rate-badge::after{
+    content:''; position:absolute; top:-30px; right:-30px; width:110px; height:110px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,196,74,.28), transparent 70%); filter:blur(6px); pointer-events:none;
+  }
+  .rate-badge-icon{font-size:20px; position:relative;}
+  .rate-badge-text{display:flex; flex-direction:column; gap:1px; position:relative;}
+  .rate-badge-label{font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+  .rate-badge-val{font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--text);}
+
   /* ---------- Search bar ---------- */
   .search-bar{
     display:flex; align-items:center; gap:9px;
@@ -661,8 +677,8 @@
 
       <div class="topup-promo-banner">
         <h4>💰 Пополняйте баланс KitsaiGG в рублях!</h4>
-        <p>У нас доступно пополнение переводом через СБП - поможем найти выгодный курс обмена и зачислим средства на ваш баланс.</p>
         <p class="tpb-perks">⚡ Быстро • 💳 Удобно • 💰 Выгодный курс</p>
+        <p>У нас доступно пополнение переводом через СБП - поможем найти выгодный курс обмена и зачислим средства на ваш баланс.</p>
         <p>Пополнение доступно на любую сумму.</p>
         <p class="tpb-cta">Для пополнения создайте тикет с темой «Пополнить баланс».</p>
       </div>
@@ -688,6 +704,13 @@
 
     <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
+      <div class="rate-badge">
+        <span class="rate-badge-icon">💱</span>
+        <span class="rate-badge-text">
+          <span class="rate-badge-label">Курс</span>
+          <span class="rate-badge-val" id="rateRateVal">—</span>
+        </span>
+      </div>
       <div class="related-links" id="rateRelatedLinks" style="display:none;"></div>
       <div class="warning-box" id="rateWarning" style="display:none;"><div class="ico">⚠️</div><div id="rateWarningText"></div></div>
       <div class="chip-grid" id="rateChips"></div>
@@ -706,7 +729,6 @@
       <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
-        <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— $</span></div>
         <div class="total-sub-row"><span class="lbl">Примерная сумма в ₽</span><span class="val" id="rateTotalSub">—₽</span></div>
       </div>
