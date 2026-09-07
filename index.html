@@ -337,6 +337,7 @@
   .order-bar .total{display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);}
   .order-bar .total .lbl{font-size:12.5px; color:var(--text-muted);}
   .order-bar .total .val{font-family:var(--font-mono); font-weight:700; font-size:20px;}
+  .order-bar .total-sub{text-align:right; font-size:11px; color:var(--text-faint); margin-top:2px;}
 
   .btn-primary{
     width:100%; margin-top:14px; border:none; border-radius:var(--radius-sm);
@@ -762,6 +763,7 @@
       <div class="order-bar">
         <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— 💲</span></div>
+        <div class="total-sub" id="itemTotalSub"></div>
       </div>
       <label class="consent-row" id="itemConsentWrap">
         <input type="checkbox" id="itemConsent">
@@ -2715,6 +2717,9 @@ function updateItemSummary(){
   const unitPriceEl = document.getElementById('itemUnitPrice');
   unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
   document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— 💲';
+  // Мелкая подпись под "Итого": +-X₽, где X — цена варианта (variants[].price) из Supabase.
+  const totalSubEl = document.getElementById('itemTotalSub');
+  if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `+-${unitPrice.toLocaleString('ru-RU')}₽` : '';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 
