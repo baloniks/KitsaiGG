@@ -485,6 +485,22 @@
   }
   .review-banner-btn:active{transform:scale(.98); filter:brightness(.96);}
 
+  .topup-promo-banner{
+    position:relative; margin:6px 0 14px; padding:15px 16px 14px;
+    border-radius:var(--radius-lg); overflow:hidden;
+    background:linear-gradient(155deg, rgba(96,146,250,.18), rgba(23,26,33,.65) 60%);
+    border:1px solid rgba(96,146,250,.3);
+    box-shadow:var(--shadow-card);
+  }
+  .topup-promo-banner::after{
+    content:''; position:absolute; top:-30px; right:-30px; width:120px; height:120px; border-radius:50%;
+    background:radial-gradient(circle, rgba(96,146,250,.3), transparent 70%); filter:blur(6px); pointer-events:none;
+  }
+  .topup-promo-banner h4{font-family:var(--font-display); font-size:14px; font-weight:600; margin-bottom:6px; position:relative;}
+  .topup-promo-banner p{font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:8px; position:relative; overflow-wrap:break-word; word-break:break-word;}
+  .topup-promo-banner p:last-child{margin-bottom:0;}
+  .topup-promo-banner .tpb-perks{font-size:11.5px; color:var(--accent-2); font-weight:600;}
+
   /* ---------- Search bar ---------- */
   .search-bar{
     display:flex; align-items:center; gap:9px;
@@ -636,6 +652,13 @@
           </div>
         </div>
         <button type="button" class="review-banner-btn" id="reviewBannerBtn">Оставить отзыв</button>
+      </div>
+
+      <div class="topup-promo-banner">
+        <h4>💰 Пополняйте баланс KitsaiGG в рублях!</h4>
+        <p>У нас доступно пополнение через СБП - поможем найти выгодный курс обмена и зачислим средства на ваш баланс.</p>
+        <p class="tpb-perks">⚡ Быстро • 💳 Удобно • 💰 Выгодный курс</p>
+        <p>Пополнение доступно на любую сумму.</p>
       </div>
 
       <div class="search-bar">
