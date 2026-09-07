@@ -1214,6 +1214,7 @@
         <input type="number" id="topupCustom" placeholder="0 $">
       </div>
 
+      <div id="topupFeeNote" style="display:none; font-size:12.5px; color:var(--text-muted); margin-top:10px; text-align:center;"></div>
       <button class="btn-primary disabled" id="topupBtn">Выберите сумму</button>
     </section>
 
@@ -3393,14 +3394,22 @@ function selectTopupCustom(){
   updateTopupBtn();
 }
 
+const TOPUP_FEE_RATE = 0.03; // комиссия CryptoBot — 3%
+
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
+  const feeNote = document.getElementById('topupFeeNote');
   if(state.topupAmount && state.topupAmount > 0){
     btn.textContent = 'Пополнить баланс';
     btn.classList.remove('disabled');
+
+    const totalDue = round2(state.topupAmount * (1 + TOPUP_FEE_RATE));
+    feeNote.textContent = `К оплате ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}$`;
+    feeNote.style.display = 'block';
   } else {
     btn.textContent = 'Выберите сумму';
     btn.classList.add('disabled');
+    feeNote.style.display = 'none';
   }
 }
 
