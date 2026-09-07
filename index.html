@@ -1553,6 +1553,10 @@ function buildProductConfigs(rows){
         // цена за 1 единицу может быть задана в долларах отдельной колонкой
         // rate_usd, а rate остаётся рублёвым резервным вариантом.
         rate: variantPrice(row, 'rate'),
+        // Настоящая рублёвая ставка — колонка rate как есть, БЕЗ приоритета
+        // rate_usd/price_usd (те нужны только для отображаемой цены в $ выше).
+        // Используется для поля "Примерная сумма в ₽" (см. updateRateSummary).
+        rateRub: Number(row.rate) || 0,
         unit: row.unit || '',
         glyph: row.glyph || '',
         // Категория товара из Supabase ('games' | 'services') — источник
@@ -1625,7 +1629,9 @@ function buildProductConfigs(rows){
               // раньше здесь всегда брался только t.rate (рубли), из-за чего
               // rate_usd у ступенчатых тарифов игнорировался и цена не
               // переключалась на доллары.
-              .map(t => ({ minQty: Number(t.min_qty), rate: variantPrice(t, 'rate') }))
+              // rubRate — настоящая рублёвая ставка тарифа (колонка rate как
+              // есть, без приоритета rate_usd/price_usd) для "Примерной суммы в ₽".
+              .map(t => ({ minQty: Number(t.min_qty), rate: variantPrice(t, 'rate'), rubRate: Number(t.rate) || 0 }))
               .sort((a, b) => a.minQty - b.minQty)
           : null
       };
@@ -1785,6 +1791,17 @@ function rateForQty(cfg, qty){
   let result = cfg.tiers[0].rate;
   for(const tier of cfg.tiers){
     if(qty >= tier.minQty) result = tier.rate; else break;
+  }
+  return result;
+}
+// То же самое, но для настоящей рублёвой ставки (cfg.rateRub / tier.rubRate) —
+// используется только для поля "Примерная сумма в ₽", чтобы оно бралось из
+// колонки rate таблицы products, а не дублировало цену в $ (см. updateRateSummary).
+function rateForQtyRub(cfg, qty){
+  if(!cfg.tiers || !cfg.tiers.length) return cfg.rateRub;
+  let result = cfg.tiers[0].rubRate;
+  for(const tier of cfg.tiers){
+    if(qty >= tier.minQty) result = tier.rubRate; else break;
   }
   return result;
 }
@@ -2350,9 +2367,12 @@ function updateRateSummary(){
   const total = round2(state.rateSelected * unitRate);
   document.getElementById('rateQtyVal').textContent = state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit;
   document.getElementById('rateTotalVal').textContent = rub(total);
-  // Под "Итого" в $ — та же сумма, но в ₽ (мелким шрифтом), без округления,
-  // тот же приоритет полей, что и в variantPrice/rateForQty выше.
-  if(totalSubEl) totalSubEl.textContent = `${fmtNum(total)}₽`;
+  // Под "Итого" в $ — примерная сумма в ₽. Считается ОТДЕЛЬНО от долларовой
+  // суммы выше: берётся настоящая рублёвая ставка (колонка rate, см.
+  // rateForQtyRub/cfg.rateRub), а не rate_usd/price_usd, которые уже
+  // использованы для total.
+  const totalRub = round2(state.rateSelected * rateForQtyRub(cfg, state.rateSelected));
+  if(totalSubEl) totalSubEl.textContent = `${fmtNum(totalRub)}₽`;
   btn.textContent = 'Купить за ' + rub(total);
   if(document.getElementById('rateConsent').checked){
     btn.classList.remove('disabled');
@@ -2432,8 +2452,12 @@ function updatePremiumSummary(){
   const price = variantPrice(plan);
   document.getElementById('premiumPlanVal').textContent = plan.label;
   document.getElementById('premiumTotalVal').textContent = rub(price);
-  // Под "Итого" в $ — та же сумма, но в ₽ (мелким шрифтом), без округления.
-  if(totalSubEl) totalSubEl.textContent = `${fmtNum(price)}₽`;
+  // Под "Итого" в $ — примерная сумма в ₽. Берётся напрямую из колонки price
+  // внутри variants (а не через variantPrice, который для основной суммы
+  // выше отдаёт приоритет rate_usd/price_usd) — иначе поле дублировало
+  // долларовую сумму под видом рублей.
+  const priceRub = Number(plan.price) || 0;
+  if(totalSubEl) totalSubEl.textContent = `${fmtNum(priceRub)}₽`;
   btn.textContent = 'Купить за ' + rub(price);
   if(document.getElementById('premiumConsent').checked){
     btn.classList.remove('disabled');
