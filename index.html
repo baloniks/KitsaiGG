@@ -682,6 +682,7 @@
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
         <div class="row"><span>Курс</span><span id="rateRateVal">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="rateTotalVal">— 💲</span></div>
+        <div class="total-sub" id="rateTotalSub"></div>
       </div>
       <label class="consent-row" id="rateConsentWrap">
         <input type="checkbox" id="rateConsent">
@@ -2334,16 +2335,23 @@ function applyCustomRateInput(cfg){
 function updateRateSummary(){
   const cfg = RATE_CONFIG[state.currentCategory];
   const btn = document.getElementById('rateBuyBtn');
+  const totalSubEl = document.getElementById('rateTotalSub');
   if(state.rateSelected == null){
     document.getElementById('rateQtyVal').textContent = '—';
     document.getElementById('rateTotalVal').textContent = '— 💲';
+    if(totalSubEl) totalSubEl.textContent = '';
     btn.textContent = cfg.selectPrompt;
     btn.classList.add('disabled');
     return;
   }
-  const total = round2(state.rateSelected * rateForQty(cfg, state.rateSelected));
+  const unitRate = rateForQty(cfg, state.rateSelected);
+  const total = round2(state.rateSelected * unitRate);
   document.getElementById('rateQtyVal').textContent = state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit;
   document.getElementById('rateTotalVal').textContent = rub(total);
+  // Мелкая подпись под "Итого": +-X₽, где X — цена варианта (variants[].rate_usd
+  // или variants[].price_usd, а если их нет — variants[].price/rate) из Supabase,
+  // тот же приоритет полей, что и variantPrice/rateForQty выше.
+  if(totalSubEl) totalSubEl.textContent = `+-${fmtNum(unitRate)}₽`;
   btn.textContent = 'Купить за ' + rub(total);
   if(document.getElementById('rateConsent').checked){
     btn.classList.remove('disabled');
@@ -2766,7 +2774,7 @@ function updateItemSummary(){
   // Мелкая подпись под "Итого": +-X₽, где X — цена варианта (variants[].rate_usd
   // или variants[].price_usd, а если их нет — variants[].price) из Supabase.
   const totalSubEl = document.getElementById('itemTotalSub');
-  if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `+-${unitPrice.toLocaleString('ru-RU')}₽` : '';
+  if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `+-${fmtNum(unitPrice)}₽` : '';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 
