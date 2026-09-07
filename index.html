@@ -509,13 +509,13 @@
   .rate-badge{
     display:flex; align-items:center; gap:10px; margin:0 0 14px; padding:12px 14px;
     border-radius:var(--radius-lg); position:relative; overflow:hidden;
-    background:linear-gradient(155deg, rgba(255,196,74,.16), rgba(23,26,33,.65) 60%);
-    border:1px solid rgba(255,196,74,.35);
+    background:linear-gradient(155deg, rgba(96,146,250,.18), rgba(23,26,33,.65) 60%);
+    border:1px solid rgba(96,146,250,.3);
     box-shadow:var(--shadow-card);
   }
   .rate-badge::after{
     content:''; position:absolute; top:-30px; right:-30px; width:110px; height:110px; border-radius:50%;
-    background:radial-gradient(circle, rgba(255,196,74,.28), transparent 70%); filter:blur(6px); pointer-events:none;
+    background:radial-gradient(circle, rgba(96,146,250,.3), transparent 70%); filter:blur(6px); pointer-events:none;
   }
   .rate-badge-icon{font-size:20px; position:relative;}
   .rate-badge-text{display:flex; flex-direction:column; gap:1px; position:relative;}
@@ -705,7 +705,6 @@
     <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
       <div class="rate-badge">
-        <span class="rate-badge-icon">💱</span>
         <span class="rate-badge-text">
           <span class="rate-badge-label">Курс</span>
           <span class="rate-badge-val" id="rateRateVal">—</span>
