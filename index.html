@@ -1762,11 +1762,20 @@ async function loadProducts(){
 
 // Возвращает цену за 1 единицу для конкретного количества qty, с учётом
 // ступенчатых тарифов (cfg.tiers). Если тарифов нет — просто cfg.rate.
-// Округляем только до центов (2 знака после запятой), чтобы убрать погрешности
-// плавающей точки (0.1+0.2 и т.п.), но НЕ округлять сумму до целого доллара —
-// цена товара должна совпадать с тем, что задано (rate * qty), без искажений.
+// Убираем только "шум" плавающей точки (0.1+0.2=0.30000000000000004 и т.п.),
+// округляя до 8 знаков после запятой — этого достаточно, чтобы погасить
+// погрешность float, но НЕ теряет реальную точность цены. Никакого округления
+// до центов/долларов: сумма/курс товара (в т.ч. очень маленькие вроде 0.0062)
+// должны совпадать с тем, что задано, без искажений.
 function round2(n){
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+  return Math.round((n + Number.EPSILON) * 1e8) / 1e8;
+}
+// Форматируем число для показа пользователю: полная точность (до 8 знаков
+// после запятой, без округления значимых цифр), но без лишних хвостовых
+// нулей — toLocaleString сам их не добавляет, т.к. minimumFractionDigits не
+// задан.
+function fmtNum(n){
+  return round2(n).toLocaleString('ru-RU', { maximumFractionDigits: 8 });
 }
 function rateForQty(cfg, qty){
   if(!cfg.tiers || !cfg.tiers.length) return cfg.rate;
@@ -1868,7 +1877,7 @@ function renderPriceCell(currentLabel, sale){
 }
 
 /* ---------------- HELPERS ---------------- */
-const rub = n => n.toLocaleString('ru-RU') + ' 💲';
+const rub = n => fmtNum(n) + ' 💲';
 
 // Возвращает цену конкретного номинала/тарифа (одного объекта внутри
 // массива variants в таблице products в Supabase, либо самой строки товара
@@ -2234,9 +2243,9 @@ function renderRateProduct(cat){
     ? cfg.tiers.map((t, i) => {
         const next = cfg.tiers[i + 1];
         const range = next ? (t.minQty + '-' + (next.minQty - 1) + ' ' + cfg.unit) : ('от ' + t.minQty + ' ' + cfg.unit);
-        return range + ': ' + t.rate.toFixed(2) + ' 💲';
+        return range + ': ' + rub(t.rate);
       }).join(' · ')
-    : '1 ' + cfg.unit + ' ≈ ' + cfg.rate.toFixed(2) + ' 💲';
+    : '1 ' + cfg.unit + ' ≈ ' + rub(cfg.rate);
 
   const grid = document.getElementById('rateChips');
   grid.innerHTML = '';
