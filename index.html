@@ -1198,6 +1198,16 @@
 
     <!-- ===================== TOP-UP ===================== -->
     <section class="view" data-view="topup">
+      <div class="warning-box" style="margin-top:2px;">
+        <div class="ico">💳</div>
+        <div>При автоматическом пополнении баланса через CryptoBot (@Send) взимается комиссия сервиса 3%.
+Если вы не хотите оплачивать комиссию, напишите нам в личные сообщения: <a href="#" id="topupManagerLink" style="color:inherit; text-decoration:underline;">@Manager_KitsaiGG</a> - пополним баланс вручную без комиссии.
+
+💰 Доступные способы пополнения:
+
+• CryptoBot (@Send) - TON. Для пополнения в USDT доступна сумма от 100 USDT.
+• Tonkeeper - TON или USDT (TRC20, TON). Пополнение на любую сумму.</div>
+      </div>
       <div class="section-label" style="margin-top:0;">Сумма пополнения</div>
       <div class="chip-grid" id="topupChips"></div>
       <div class="field">
@@ -2010,12 +2020,24 @@ function renderReferral(){
 /* Подтягиваем статистику по рефералам с сервера */
 // Кэш реферальной статистики — данные меняются только при покупках рефералов,
 // поэтому запрашиваем не чаще одного раза в 10 минут.
-const REFERRAL_STATS_CACHE_KEY = 'kitsaigg_referral_stats_cache';
+// ВАЖНО: ключ кэша должен быть привязан к конкретному telegram_id — иначе
+// это был баг: один и тот же общий ключ в localStorage читали/писали ВСЕ
+// пользователи, поэтому у всех показывалась статистика того, кто зашёл
+// первым и закэшировал её на 6 часов.
+const REFERRAL_STATS_CACHE_KEY_BASE = 'kitsaigg_referral_stats_cache';
 const REFERRAL_STATS_TTL_MS = 6 * 60 * 60 * 1000; // 6 часов
+
+function getReferralStatsCacheKey() {
+  // Без привязки к пользователю кэш не годится — просто не используем его.
+  if (!state.telegramId) return null;
+  return `${REFERRAL_STATS_CACHE_KEY_BASE}_${state.telegramId}`;
+}
 
 function getReferralStatsCache() {
   try {
-    const raw = localStorage.getItem(REFERRAL_STATS_CACHE_KEY);
+    const key = getReferralStatsCacheKey();
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.ts) return null;
@@ -2028,7 +2050,9 @@ function getReferralStatsCache() {
 
 function setReferralStatsCache(count, earned) {
   try {
-    localStorage.setItem(REFERRAL_STATS_CACHE_KEY, JSON.stringify({
+    const key = getReferralStatsCacheKey();
+    if (!key) return;
+    localStorage.setItem(key, JSON.stringify({
       ts: Date.now(),
       count,
       earned
@@ -3666,6 +3690,12 @@ document.addEventListener('DOMContentLoaded', () => {
     pushView('support', {sub:true, title:'Поддержка'});
   });
   document.getElementById('linkReviews').addEventListener('click', () => openExternalLink(REVIEW_GROUP_URL));
+
+  // Ссылка на менеджера в плашке про комиссию CryptoBot (экран пополнения)
+  document.getElementById('topupManagerLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    openExternalLink('https://t.me/Manager_KitsaiGG');
+  });
   document.getElementById('linkTerms').addEventListener('click', () => pushView('terms', {sub:true, title:'Пользовательское соглашение'}));
   document.getElementById('linkPrivacy').addEventListener('click', () => pushView('privacy', {sub:true, title:'Политика конфиденциальности'}));
   document.getElementById('linkRefundPolicy').addEventListener('click', () => pushView('refund-policy', {sub:true, title:'Политика возвратов'}));
