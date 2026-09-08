@@ -810,7 +810,7 @@
         </div>
       </div>
       <div class="order-bar">
-        <div class="row"><span>Цена за штуку</span><span id="itemUnitPrice">—</span></div>
+        <div class="row"><span id="itemUnitPriceLabel">Цена за штуку</span><span id="itemUnitPrice">—</span></div>
         <div class="total"><span class="lbl">Итого</span><span class="val" id="itemTotalVal">— $</span></div>
         <div class="total-sub-row"><span class="lbl">Примерная сумма в ₽</span><span class="val" id="itemTotalSub">—₽</span></div>
       </div>
@@ -1783,6 +1783,12 @@ function buildProductConfigs(rows){
         description2: row.description_2 || '',
         consentText: row.consent_text || '',
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
+        // Подпись строки "Цена за штуку" в блоке итогов на карточке товара —
+        // раньше была жёстко зашита в HTML и не менялась из Supabase, теперь
+        // берётся из колонки qty_label (по тому же принципу, что qtyLabel у
+        // type='rate' и planLabel у type='more-item'). Пусто/NULL в qty_label
+        // → остаётся значение по умолчанию "Цена за штуку".
+        unitPriceLabel: (row.qty_label && String(row.qty_label).trim()) ? row.qty_label : 'Цена за штуку',
         usernameFormat: normalizeUsernameFormat(row.username_format),
         selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите вариант',
         fieldLabel2: row.field_label_2 || '',
@@ -2812,6 +2818,7 @@ function renderItemDetail(item){
   document.getElementById('itemGlyph').innerHTML = glyphHtml(item.glyph, item.imageUrl);
   document.getElementById('itemTitle').textContent = item.title;
   document.getElementById('itemSubtitle').textContent = item.sub;
+  document.getElementById('itemUnitPriceLabel').textContent = item.unitPriceLabel || 'Цена за штуку';
   document.getElementById('itemFieldWrap').style.display = item.needsField ? '' : 'none';
   document.getElementById('itemFieldLabel').textContent = item.fieldLabel;
   document.getElementById('itemUsername').placeholder = item.fieldPlaceholder || '@username или ник в игре';
