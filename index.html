@@ -2849,7 +2849,12 @@ function renderItemDetail(item){
   itemDesc.style.display = item.description ? '' : 'none';
   const itemDescTitle = document.getElementById('itemDescriptionTitle');
   itemDescTitle.textContent = item.descriptionTitle;
-  itemDescTitle.style.display = (item.description && item.descriptionTitle) ? '' : 'none';
+  // Раньше заголовок описания показывался только вместе с самим описанием
+  // (description) — а у подарочных карт (gift) description_title часто
+  // заполнен отдельно, без основного текста description, и заголовок
+  // из-за этого условия просто не появлялся. Условие должно зависеть
+  // только от того, задан ли сам заголовок.
+  itemDescTitle.style.display = item.descriptionTitle ? '' : 'none';
   const itemDesc2 = document.getElementById('itemDescription2');
   document.getElementById('itemDescription2Text').textContent = item.description2;
   itemDesc2.style.display = item.description2 ? '' : 'none';
