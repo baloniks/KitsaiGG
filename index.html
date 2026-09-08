@@ -839,7 +839,7 @@
         </label>
         <div class="kcoin-amount-row" id="kcoinAmountRow" style="display:none;">
           <button type="button" id="kcoinMinus">−</button>
-          <input type="number" id="kcoinAmountInput" min="0" step="1" inputmode="numeric">
+          <input type="number" id="kcoinAmountInput" min="0" step="0.01" inputmode="decimal">
           <button type="button" id="kcoinPlus">+</button>
           <button type="button" class="kmax" id="kcoinMaxBtn">Макс</button>
         </div>
@@ -3123,8 +3123,16 @@ function receiptHTML(p, id, stamped){
 }
 
 // Считаем максимум KCoin, которым можно закрыть покупку: не больше цены и не больше баланса KCoin.
+// Раньше округлялось до целого (Math.floor), из-за чего минимальным шагом
+// списания фактически был 1 KCoin — теперь округляем только до 0.01 (копейки
+// KCoin), это и есть минимальная сумма списания.
 function maxKcoinFor(p){
-  return Math.max(0, Math.min(Math.floor(p.price), Math.floor(state.kcoinBalance || 0)));
+  return Math.max(0, roundKcoin(Math.min(p.price, state.kcoinBalance || 0)));
+}
+
+// Округление суммы KCoin до 0.01 — минимального шага списания.
+function roundKcoin(n){
+  return Math.round((Number(n) || 0) * 100) / 100;
 }
 
 // Номер чека фиксируем один раз на весь чекаут, чтобы он не "прыгал" при пересчёте KCoin.
@@ -3148,7 +3156,7 @@ function renderKcoinBox(p){
   }
 
   box.style.display = 'block';
-  avail.textContent = Math.floor(state.kcoinBalance).toLocaleString('ru-RU');
+  avail.textContent = fmtNum(state.kcoinBalance);
 
   // По умолчанию KCoin не списываем — галочка выключена, пока пользователь сам её не включит.
   if(state.pendingKcoinToUse == null){
@@ -3180,20 +3188,20 @@ function renderKcoinBox(p){
   };
 
   input.oninput = () => {
-    let v = Math.floor(Number(input.value) || 0);
+    let v = roundKcoin(Number(input.value) || 0);
     v = Math.max(0, Math.min(v, max));
     state.pendingKcoinToUse = v;
     updateAndRerender();
   };
 
   document.getElementById('kcoinMinus').onclick = () => {
-    state.pendingKcoinToUse = Math.max(0, (state.pendingKcoinToUse||0) - 1);
+    state.pendingKcoinToUse = Math.max(0, roundKcoin((state.pendingKcoinToUse||0) - 0.01));
     input.value = state.pendingKcoinToUse;
     toggle.checked = state.pendingKcoinToUse > 0;
     updateAndRerender();
   };
   document.getElementById('kcoinPlus').onclick = () => {
-    state.pendingKcoinToUse = Math.min(max, (state.pendingKcoinToUse||0) + 1);
+    state.pendingKcoinToUse = Math.min(max, roundKcoin((state.pendingKcoinToUse||0) + 0.01));
     input.value = state.pendingKcoinToUse;
     toggle.checked = state.pendingKcoinToUse > 0;
     updateAndRerender();
@@ -3243,7 +3251,7 @@ async function confirmPurchase(){
     return;
   }
 
-  const kcoinToUse = Math.max(0, Math.min(Math.floor(state.pendingKcoinToUse||0), Math.floor(p.price), Math.floor(state.kcoinBalance||0)));
+  const kcoinToUse = Math.max(0, Math.min(roundKcoin(state.pendingKcoinToUse||0), roundKcoin(p.price), roundKcoin(state.kcoinBalance||0)));
 
   try {
     const { data, error } = await supabaseClient.functions.invoke('create-order', {
