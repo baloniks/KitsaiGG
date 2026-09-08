@@ -3555,7 +3555,7 @@ function selectTopupCustom(){
   updateTopupBtn();
 }
 
-const TOPUP_FEE_RATE = 0.03; // комиссия CryptoBot — 3%
+const TOPUP_FEE_RATE = 0.05; // комиссия CryptoBot — 5%
 
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
@@ -3907,11 +3907,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Профиль и пополнение
   document.getElementById('btnProfileTopup').addEventListener('click', openTopup);
   document.getElementById('topupCustom').addEventListener('input', selectTopupCustom);
-  document.getElementById('topupBtn').addEventListener('click', () => showToast('Пополнение временно недоступно'));
-  // Реальное подключение оплаты (create-invoice) закомментировано на время —
-  // сама функция confirmTopup() ниже в коде осталась нетронутой, просто
-  // сейчас не подключена к кнопке. Чтобы включить обратно, замени строку
-  // выше на: document.getElementById('topupBtn').addEventListener('click', confirmTopup);
+  document.getElementById('topupBtn').addEventListener('click', confirmTopup);
+  // Автопополнение снова включено: кнопка вызывает confirmTopup(), которая
+  // создаёт счёт через create-invoice (Edge Function) и открывает оплату в CryptoBot.
 
   // Ссылки в профиле
   document.getElementById('linkSupport').addEventListener('click', () => pushView('support', {sub:true, title:'Поддержка'}));
