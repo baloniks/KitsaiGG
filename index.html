@@ -2943,8 +2943,17 @@ function updateItemSummary(){
   document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— $';
   // Под "Итого" в $ — примерная сумма в ₽, посчитанная из настоящего
   // рублёвого значения (unitPriceRub), а не из долларового unitPrice.
+  // Показываем эту строку, только если рублёвое значение реально ОТЛИЧАЕТСЯ
+  // от долларового — то есть у товара/номинала заполнен отдельный
+  // rate_usd/price_usd (курсовая цена в $), а price — настоящая цена в
+  // рублях. У многих gift-карт цена сразу задана в $ без отдельного
+  // рублёвого номинала, и тогда unitPriceRub совпадает с unitPrice —
+  // раньше строка в этом случае просто дублировала цену в $ под видом ₽.
   const totalSubEl = document.getElementById('itemTotalSub');
-  if(totalSubEl) totalSubEl.textContent = unitPriceRub != null ? `${fmtNum(unitPriceRub * state.itemQty)}₽` : '— ₽';
+  const totalSubRow = totalSubEl ? totalSubEl.closest('.total-sub-row') : null;
+  const hasDistinctRub = unitPriceRub != null && unitPrice != null && Math.abs(unitPriceRub - unitPrice) > 1e-9;
+  if(totalSubRow) totalSubRow.style.display = hasDistinctRub ? '' : 'none';
+  if(totalSubEl) totalSubEl.textContent = hasDistinctRub ? `${fmtNum(unitPriceRub * state.itemQty)}₽` : '—₽';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 
