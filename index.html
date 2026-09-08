@@ -1544,7 +1544,15 @@ let CATALOG_ITEMS = [];
 //                          карты", у неё свои подкатегории 'games'/'services',
 //                          см. CATALOG_SUBCATEGORIES.giftcards выше)
 //   subcats       text[] — массив id подкатегорий (см. CATALOG_SUBCATEGORIES выше)
-//   price         numeric — для type='list-item' и type='gift': фиксированная цена;
+//   price         numeric — для type='list-item' и type='gift': рублёвая цена
+//                          товара (когда у него нет вариантов/номиналов).
+//                          Если также заполнена rate_usd (или price_usd) —
+//                          именно она показывается как цена ("Итого", $), а
+//                          price используется только для строки "Примерная
+//                          сумма в ₽" внизу карточки (см. variantPrice и
+//                          updateItemSummary). Если rate_usd/price_usd не
+//                          заполнены — обе строки покажут одно и то же число,
+//                          просто в разных валютах;
 //                          для type='rate': необязательное переопределение
 //                          цены в каталоге (если NULL — считается как
 //                          мин. количество × rate, см. catalogItemPrice)
@@ -1774,7 +1782,16 @@ function buildProductConfigs(rows){
       }
       LIST_CONFIG[groupKey].items.push({
         id: row.id, glyph: row.glyph || '', imageUrl: row.image_url || '', title: row.title,
-        sub: row.sub || '', price: Number(row.price) || 0,
+        sub: row.sub || '',
+        // price — отображаемая цена в $ ("Итого"). Приоритет: rate_usd -> price_usd
+        // -> price (см. variantPrice), тот же принцип, что и у type='rate'/'more-item'.
+        price: variantPrice(row, 'price'),
+        // priceRub — настоящая рублёвая цена (колонка price как есть, БЕЗ
+        // приоритета rate_usd/price_usd). Используется ТОЛЬКО для строки
+        // "Примерная сумма в ₽" под "Итого" — раньше эта строка просто
+        // дублировала price в $ под видом ₽, вместо того чтобы брать
+        // отдельное рублёвое значение (см. updateItemSummary).
+        priceRub: Number(row.price) || 0,
         variants: Array.isArray(row.variants) && row.variants.length ? row.variants : null,
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
@@ -2893,6 +2910,14 @@ function updateItemSummary(){
     ? item.variants[state.itemVariantSelected]
     : null;
   const unitPrice = hasVariants ? (selectedVariant ? variantPrice(selectedVariant) : null) : item.price;
+  // Настоящая рублёвая цена за штуку — для варианта берём его собственную
+  // "сырую" колонку price (без приоритета rate_usd/price_usd, см. variants в
+  // buildProductConfigs), для товара без вариантов — item.priceRub. Раньше
+  // тут просто заново использовался unitPrice ($), из-за чего строка
+  // "Примерная сумма в ₽" дублировала долларовую сумму под другим знаком.
+  const unitPriceRub = hasVariants
+    ? (selectedVariant ? (Number(selectedVariant.price) || 0) : null)
+    : item.priceRub;
   // Акция (old_price) — у выбранного номинала, либо у самого товара, если у него
   // нет номиналов (variants — объект-пометка, см. saleOldPrice).
   const saleOldPrice = hasVariants
@@ -2903,10 +2928,10 @@ function updateItemSummary(){
   const unitPriceEl = document.getElementById('itemUnitPrice');
   unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
   document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— $';
-  // Под "Итого" в $ — та же сумма (unitPrice * qty), но в ₽ (мелким шрифтом),
-  // без округления, тот же приоритет полей, что и variantPrice выше.
+  // Под "Итого" в $ — примерная сумма в ₽, посчитанная из настоящего
+  // рублёвого значения (unitPriceRub), а не из долларового unitPrice.
   const totalSubEl = document.getElementById('itemTotalSub');
-  if(totalSubEl) totalSubEl.textContent = unitPrice != null ? `${fmtNum(unitPrice * state.itemQty)}₽` : '— ₽';
+  if(totalSubEl) totalSubEl.textContent = unitPriceRub != null ? `${fmtNum(unitPriceRub * state.itemQty)}₽` : '— ₽';
   const plusBtn = document.getElementById('btnQtyPlus');
   if(plusBtn) plusBtn.disabled = state.itemQty >= max;
 
