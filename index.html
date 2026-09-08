@@ -3479,25 +3479,45 @@ function openOrderDetail(id){
 
 // Копирует текст в буфер обмена (с фолбэком для окружений без navigator.clipboard,
 // например старых WebView в Telegram Desktop) и показывает тост об успехе.
+// Копирует текст в буфer обмена. Сначала пробуем современный
+// navigator.clipboard.writeText, а при ЛЮБОЙ его ошибке — не только когда
+// API вообще недоступен, но и когда браузер его заблокировал через
+// Permissions-Policy (см. NotAllowedError: "The Clipboard API has been
+// blocked because of a permissions policy...", типично для встроенного
+// Telegram WebView) — откатываемся на textarea + execCommand('copy').
+// Раньше этот откат делался только когда navigator.clipboard вообще
+// отсутствовал; если же он существовал, но был заблокирован политикой,
+// writeText сразу падал в catch и копирование просто не происходило.
+function legacyCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if(!ok) throw new Error('execCommand copy failed');
+}
+
 async function copyToClipboard(text, successMessage = 'Скопировано'){
   try {
     if(navigator.clipboard && window.isSecureContext){
       await navigator.clipboard.writeText(text);
     } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+      legacyCopy(text);
     }
     showToast(successMessage);
   } catch(e){
-    console.error('copyToClipboard error:', e);
-    showToast('Не удалось скопировать');
+    console.warn('navigator.clipboard недоступен/заблокирован, пробуем execCommand:', e);
+    try {
+      legacyCopy(text);
+      showToast(successMessage);
+    } catch(e2){
+      console.error('copyToClipboard error:', e2);
+      showToast('Не удалось скопировать');
+    }
   }
 }
 
