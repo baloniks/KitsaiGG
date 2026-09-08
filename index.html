@@ -1478,9 +1478,10 @@ async function dismissReviewBanner(){
 /* ---------------- CATALOG: категории, подкатегории, поиск ---------------- */
 // Верхнеуровневые категории каталога. "Все" всегда первая и снимает выбор.
 const CATALOG_CATEGORIES = [
-  { id:'all',      label:'Все',      icon:'✨' },
-  { id:'games',    label:'Игры',     icon:'🎮' },
-  { id:'services', label:'Сервисы',  icon:'⚙️' },
+  { id:'all',        label:'Все',              icon:'✨' },
+  { id:'games',      label:'Игры',             icon:'🎮' },
+  { id:'services',   label:'Сервисы',          icon:'⚙️' },
+  { id:'giftcards',  label:'Подарочные карты', icon:'🎁' },
 ];
 
 // Подкатегории показываются только для категорий, у которых они заданы здесь.
@@ -1501,6 +1502,14 @@ const CATALOG_SUBCATEGORIES = {
     { id:'social',  label:'Социальные' },
     { id:'telegram',label:'Telegram' },
     { id:'other',   label:'Прочее' },
+  ],
+  // Подкатегории для верхнеуровневой категории "Подарочные карты" (id='giftcards').
+  // Обратите внимание: id этих подкатегорий ('games'/'services') — свои,
+  // локальные для категории giftcards, и не пересекаются с id верхнеуровневых
+  // категорий 'games'/'services' выше — это разные, независимые списки.
+  giftcards: [
+    { id:'games',    label:'Игры' },
+    { id:'services', label:'Сервисы' },
   ]
 };
 
@@ -1517,15 +1526,25 @@ let CATALOG_ITEMS = [];
 // Ожидаемые колонки таблицы products (все, кроме id/type/title/category, могут
 // быть NULL — используются только для своего типа товара):
 //   id            text   — уникальный идентификатор товара (например 'valorant-1000')
-//   type          text   — 'rate' | 'more-item' | 'list-item'
+//   type          text   — 'rate' | 'more-item' | 'list-item' | 'gift'
+//                          'gift' — подарочные карты: технически обрабатывается
+//                          точно так же, как 'list-item' (фиксированная цена
+//                          или номиналы через variants, поле получателя и т.д.),
+//                          это просто отдельная явная метка типа товара в базе.
+//                          Обычно у таких товаров group_key='giftcards' и
+//                          category='giftcards' (см. ниже), но это не обязательно.
 //   group_key     text   — для type='rate': ключ группы (например 'stars'/'robux');
-//                          для type='list-item': ключ группы для группировки (например 'keys'/'giftcards')
+//                          для type='list-item' и type='gift': ключ группы для
+//                          группировки (например 'keys'/'giftcards')
 //   title         text   — название
 //   sub           text   — подзаголовок/описание
 //   glyph         text   — эмодзи-иконка
-//   category      text   — 'games' | 'services' (верхнеуровневая категория)
+//   category      text   — 'games' | 'services' | 'giftcards' (верхнеуровневая
+//                          категория; 'giftcards' — категория "Подарочные
+//                          карты", у неё свои подкатегории 'games'/'services',
+//                          см. CATALOG_SUBCATEGORIES.giftcards выше)
 //   subcats       text[] — массив id подкатегорий (см. CATALOG_SUBCATEGORIES выше)
-//   price         numeric — для type='list-item': фиксированная цена;
+//   price         numeric — для type='list-item' и type='gift': фиксированная цена;
 //                          для type='rate': необязательное переопределение
 //                          цены в каталоге (если NULL — считается как
 //                          мин. количество × rate, см. catalogItemPrice)
@@ -1745,8 +1764,11 @@ function buildProductConfigs(rows){
       });
       PRODUCTS_BY_ID[row.id] = { type: 'more-item', key: row.id };
 
-    } else if(row.type === 'list-item'){
-      const groupKey = row.group_key || 'other';
+    } else if(row.type === 'list-item' || row.type === 'gift'){
+      // 'gift' (подарочные карты) обрабатывается идентично 'list-item' —
+      // та же структура LIST_CONFIG, та же карточка товара и та же покупка,
+      // просто в базе это отдельное, явное значение type.
+      const groupKey = row.group_key || (row.type === 'gift' ? 'giftcards' : 'other');
       if(!LIST_CONFIG[groupKey]){
         LIST_CONFIG[groupKey] = { title: GROUP_TITLES[groupKey] || groupKey, items: [] };
       }
