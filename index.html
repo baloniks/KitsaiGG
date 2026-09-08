@@ -2926,7 +2926,20 @@ function updateItemSummary(){
 
   document.getElementById('itemQty').textContent = state.itemQty;
   const unitPriceEl = document.getElementById('itemUnitPrice');
-  unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
+  // Если подпись строки задана вручную через qty_label (например "Вы получите"
+  // у подарочных карт, вместо дефолтной "Цена за штуку") — справа должно быть
+  // название выбранного номинала (что именно получит покупатель), а не цена:
+  // цена и так продублирована строкой "Итого" сразу под этим блоком. Раньше
+  // тут при любой подписи всегда подставлялась цена, из-за чего "Вы получите"
+  // показывало сумму того же товара вместо его наименования.
+  const isCustomUnitLabel = !!(item.unitPriceLabel && item.unitPriceLabel !== 'Цена за штуку');
+  if(isCustomUnitLabel){
+    // Товар с номиналами — показываем выбранный номинал; товар без номиналов —
+    // собственное название товара (у него и так одна фиксированная цена).
+    unitPriceEl.textContent = hasVariants ? (selectedVariant ? selectedVariant.label : '—') : item.title;
+  } else {
+    unitPriceEl.innerHTML = unitPrice == null ? '—' : renderPriceCell(rub(unitPrice), saleOldPrice != null ? { oldPrice: saleOldPrice } : null);
+  }
   document.getElementById('itemTotalVal').textContent = unitPrice != null ? rub(unitPrice * state.itemQty) : '— $';
   // Под "Итого" в $ — примерная сумма в ₽, посчитанная из настоящего
   // рублёвого значения (unitPriceRub), а не из долларового unitPrice.
