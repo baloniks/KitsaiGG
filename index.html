@@ -3479,7 +3479,7 @@ function openOrderDetail(id){
 
 // Копирует текст в буфер обмена (с фолбэком для окружений без navigator.clipboard,
 // например старых WebView в Telegram Desktop) и показывает тост об успехе.
-async function copyToClipboard(text){
+async function copyToClipboard(text, successMessage = 'Скопировано'){
   try {
     if(navigator.clipboard && window.isSecureContext){
       await navigator.clipboard.writeText(text);
@@ -3494,7 +3494,7 @@ async function copyToClipboard(text){
       document.execCommand('copy');
       document.body.removeChild(ta);
     }
-    showToast('ID заказа скопирован');
+    showToast(successMessage);
   } catch(e){
     console.error('copyToClipboard error:', e);
     showToast('Не удалось скопировать');
@@ -3783,7 +3783,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Копирование ID заказа по тапу на чеке (делегируем, т.к. чек вставляется динамически)
   document.addEventListener('click', (e) => {
     const el = e.target.closest('.copy-id');
-    if(el) copyToClipboard(el.dataset.copy);
+    if(el) copyToClipboard(el.dataset.copy, 'ID заказа скопирован');
   });
   // Инициализация Telegram WebApp
   if (window.Telegram && window.Telegram.WebApp) {
@@ -3984,14 +3984,15 @@ document.addEventListener('DOMContentLoaded', () => {
     dismissReviewBanner();
   });
 
-  // Копировать реферальную ссылку
+  // Копировать реферальную ссылку — используем общий copyToClipboard с
+  // фолбэком через execCommand('copy') для WebView без navigator.clipboard
+  // (например старый Telegram Desktop) или без безопасного контекста.
+  // Раньше здесь копирование шло напрямую через navigator.clipboard.writeText
+  // без фолбэка и без обработки ошибки — если API было недоступно или падало,
+  // ссылка не копировалась, а тост "Ссылка скопирована" всё равно показывался.
   document.getElementById('btnCopyRef').addEventListener('click', () => {
     const link = document.getElementById('refLinkText').textContent;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(() => showToast('Ссылка скопирована'));
-    } else {
-      showToast('Ссылка скопирована');
-    }
+    copyToClipboard(link, 'Ссылка скопирована');
   });
 
   // Начальная отрисовка
