@@ -605,11 +605,11 @@
   .ref-link-row span{flex:1; font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .ref-link-row button{background:var(--accent); border:none; color:#fff; border-radius:8px; padding:7px 11px; font-size:11.5px; font-weight:600; cursor:pointer; flex-shrink:0;}
 
-  .promo-row{display:flex; gap:8px; margin-bottom:18px; align-items:stretch;}
-  .promo-row input{flex:1; min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-mono); font-size:13px; outline:none;}
-  .promo-row button{flex:none; background:var(--gold); border:none; color:#1a1200; font-weight:700; border-radius:var(--radius-sm); padding:12px 18px; font-size:13px; cursor:pointer; white-space:nowrap; transition:filter .1s, transform .1s;}
-  .promo-row button:active{transform:scale(.98); filter:brightness(.95);}
-  .promo-row button:disabled{opacity:.6; cursor:default;}
+  .balance-promo-row{display:flex; gap:8px; margin-bottom:18px; align-items:stretch;}
+  .balance-promo-row input{flex:1; min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-mono); font-size:13px; outline:none;}
+  .balance-promo-row button{flex:none; background:var(--gold); border:none; color:#1a1200; font-weight:700; border-radius:var(--radius-sm); padding:12px 18px; font-size:13px; cursor:pointer; white-space:nowrap; transition:filter .1s, transform .1s;}
+  .balance-promo-row button:active{transform:scale(.98); filter:brightness(.95);}
+  .balance-promo-row button:disabled{opacity:.6; cursor:default;}
 
   /* ---------- Top-up ---------- */
   .paymethod{
@@ -931,7 +931,7 @@
         <button class="btn-primary" style="margin-top:0;" id="btnProfileTopup">Пополнить баланс</button>
       </div>
 
-      <div class="promo-row">
+      <div class="balance-promo-row">
         <input type="text" id="promoInput" placeholder="Промокод">
         <button id="btnPromoApply">Применить</button>
       </div>
