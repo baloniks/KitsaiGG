@@ -398,6 +398,24 @@
   .kcoin-amount-row .kmax{
     background:var(--gold-soft); border-color:transparent; color:var(--gold); font-size:12px; width:auto; padding:0 10px; font-weight:600;
   }
+  .promo-box{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
+    padding:12px 14px; margin-top:10px;
+  }
+  .promo-row{display:flex; align-items:center; gap:8px;}
+  .promo-row input{
+    flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+    color:var(--text); font-family:var(--font-mono); font-size:14px; text-transform:uppercase; padding:9px 10px;
+  }
+  .promo-row .btn-secondary{flex:none; padding:9px 14px; font-size:13px;}
+  .promo-applied{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-size:13px; color:var(--green);
+  }
+  .promo-applied button{
+    background:none; border:none; color:var(--text-faint); font-size:14px; line-height:1; cursor:pointer; padding:4px;
+  }
+  .promo-error{color:var(--danger); font-size:12px; margin-top:6px;}
   .receipt .stamp{
     margin-top:14px; text-align:center; font-size:10.5px; letter-spacing:2px; color:var(--green);
     border:1px solid var(--green); border-radius:6px; padding:5px; transform:rotate(-1deg);
@@ -831,6 +849,16 @@
     <section class="view" data-view="checkout">
       <div class="receipt-wrap">
         <div class="receipt" id="checkoutReceipt"></div>
+      </div>
+      <div class="promo-box" id="promoBox">
+        <div class="promo-row" id="promoRowInput">
+          <input type="text" id="promoInput" placeholder="Промокод" autocomplete="off" autocapitalize="characters">
+          <button type="button" class="btn-secondary" id="promoApplyBtn" style="margin-top:0;">Применить</button>
+        </div>
+        <div class="promo-applied" id="promoApplied" style="display:none;">
+          <span id="promoAppliedText"></span>
+          <button type="button" id="promoRemoveBtn" aria-label="Убрать промокод">✕</button>
+        </div>
       </div>
       <div class="kcoin-box" id="kcoinBox" style="display:none;">
         <label class="kcoin-toggle">
@@ -1358,6 +1386,10 @@ const state = {
   itemVariantSelected: null,
   topupAmount: null,
   pendingPurchase: null,
+  // Промокод, применённый к текущему оформляемому заказу. null, пока не
+  // введён/не подтверждён. { code, discountPercent } после успешной проверки
+  // через Edge Function validate-promo — см. applyPromoCode().
+  appliedPromo: null,
   navStack: ['catalog']
 };
 
@@ -3167,10 +3199,13 @@ function attemptBuy(type){
 }
 
 function receiptHTML(p, id, stamped){
-  const kcoinUsed = stamped ? (p.kcoinUsedFinal ?? 0) : Math.max(0, Math.min(state.pendingKcoinToUse||0, p.price, state.kcoinBalance));
-  const rubDue = Math.max(0, p.price - kcoinUsed);
+  const priceAfterPromo = stamped ? (p.priceAfterPromoFinal ?? p.price) : promoDiscountedPrice(p);
+  const kcoinUsed = stamped ? (p.kcoinUsedFinal ?? 0) : Math.max(0, Math.min(state.pendingKcoinToUse||0, priceAfterPromo, state.kcoinBalance));
+  const rubDue = Math.max(0, priceAfterPromo - kcoinUsed);
   const balanceBefore = state.balance;
   const balanceAfter = balanceBefore - rubDue;
+  const promoLabel = stamped ? p.promoCodeFinal : state.appliedPromo?.code;
+  const promoPercent = stamped ? p.promoDiscountPercentFinal : state.appliedPromo?.discountPercent;
   return `
     <div class="rhead">
       <div class="k">KitsaiGG</div>
@@ -3179,6 +3214,10 @@ function receiptHTML(p, id, stamped){
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${p.title}</span></div>
     ${p.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${p.recipient}</span></div>` : ''}
     ${p.recipient2 ? `<div class="receipt-row"><span>${p.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${p.recipient2}</span></div>` : ''}
+    ${promoLabel ? `
+    <div class="receipt-row"><span>Цена</span><span class="fill"></span><span class="value">${rub(p.price)}</span></div>
+    <div class="receipt-row"><span>Промокод ${escapeHtml(promoLabel)}</span><span class="fill"></span><span class="value" style="color:var(--green)">− ${promoPercent}%</span></div>
+    ` : ''}
     <div class="receipt-row"><span>Способ оплаты</span><span class="fill"></span><span class="value">${kcoinUsed>0 ? (rubDue>0 ? 'Баланс + KCoin' : 'KCoin') : 'Баланс KitsaiGG'}</span></div>
     ${kcoinUsed>0 ? `
     <div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${kcoinUsed.toLocaleString('ru-RU')} KC</span></div>
@@ -3198,8 +3237,15 @@ function receiptHTML(p, id, stamped){
 // Раньше округлялось до целого (Math.floor), из-за чего минимальным шагом
 // списания фактически был 1 KCoin — теперь округляем только до 0.01 (копейки
 // KCoin), это и есть минимальная сумма списания.
+// Цена товара с учётом применённого промокода (если есть) — используется
+// как для расчёта максимума KCoin, так и для "Итого к оплате" в чеке.
+function promoDiscountedPrice(p){
+  if(!state.appliedPromo) return p.price;
+  return Math.max(0, round2(p.price * (1 - state.appliedPromo.discountPercent / 100)));
+}
+
 function maxKcoinFor(p){
-  return Math.max(0, roundKcoin(Math.min(p.price, state.kcoinBalance || 0)));
+  return Math.max(0, roundKcoin(Math.min(promoDiscountedPrice(p), state.kcoinBalance || 0)));
 }
 
 // Округление суммы KCoin до 0.01 — минимального шага списания.
@@ -3288,8 +3334,9 @@ function renderKcoinBox(p){
 
 function updateConfirmButton(p){
   const btn = document.getElementById('checkoutConfirmBtn');
-  const kcoinUsed = Math.max(0, Math.min(state.pendingKcoinToUse||0, p.price, state.kcoinBalance));
-  const rubDue = Math.max(0, p.price - kcoinUsed);
+  const priceAfterPromo = promoDiscountedPrice(p);
+  const kcoinUsed = Math.max(0, Math.min(state.pendingKcoinToUse||0, priceAfterPromo, state.kcoinBalance));
+  const rubDue = Math.max(0, priceAfterPromo - kcoinUsed);
   if(state.balance < rubDue){
     btn.textContent = 'Недостаточно средств — пополнить';
     btn.onclick = () => openTopup();
@@ -3301,9 +3348,101 @@ function updateConfirmButton(p){
 
 function renderCheckoutReceipt(p){
   state.pendingKcoinToUse = null; // сбрасываем при заходе на новый чек, дефолт выставит renderKcoinBox
+  state.appliedPromo = null; // промокод не переносится между разными покупками
+  document.getElementById('checkoutReceipt').innerHTML = receiptHTML(p, checkoutId(p), false);
+  renderPromoBox(p);
+  renderKcoinBox(p);
+  updateConfirmButton(p);
+}
+
+// Полный пересчёт чека + блока KCoin + кнопки подтверждения после того, как
+// применили/убрали промокод или изменили сумму KCoin к списанию.
+function rerenderCheckout(p){
   document.getElementById('checkoutReceipt').innerHTML = receiptHTML(p, checkoutId(p), false);
   renderKcoinBox(p);
   updateConfirmButton(p);
+}
+
+function renderPromoBox(p){
+  const input = document.getElementById('promoInput');
+  const applyBtn = document.getElementById('promoApplyBtn');
+  const rowInput = document.getElementById('promoRowInput');
+  const appliedBox = document.getElementById('promoApplied');
+  const appliedText = document.getElementById('promoAppliedText');
+  const removeBtn = document.getElementById('promoRemoveBtn');
+
+  input.value = '';
+  let errorEl = document.getElementById('promoError');
+  if(errorEl) errorEl.remove();
+  rowInput.style.display = 'flex';
+  appliedBox.style.display = 'none';
+
+  applyBtn.onclick = () => applyPromoCode(p);
+  input.onkeydown = (e) => { if(e.key === 'Enter') applyPromoCode(p); };
+
+  removeBtn.onclick = () => {
+    state.appliedPromo = null;
+    renderPromoBox(p);
+    rerenderCheckout(p);
+  };
+
+  if(state.appliedPromo){
+    rowInput.style.display = 'none';
+    appliedBox.style.display = 'flex';
+    appliedText.textContent = `✓ Промокод ${state.appliedPromo.code} применён — скидка ${state.appliedPromo.discountPercent}%`;
+  }
+}
+
+function showPromoError(msg){
+  let errorEl = document.getElementById('promoError');
+  if(!errorEl){
+    errorEl = document.createElement('div');
+    errorEl.id = 'promoError';
+    errorEl.className = 'promo-error';
+    document.getElementById('promoBox').appendChild(errorEl);
+  }
+  errorEl.textContent = msg;
+}
+
+async function applyPromoCode(p){
+  const input = document.getElementById('promoInput');
+  const code = input.value.trim();
+  if(!code){ showPromoError('Введите промокод'); return; }
+
+  const initData = getTelegramInitData();
+  if(!initData){
+    showPromoError('Откройте приложение через Telegram-бота');
+    return;
+  }
+
+  const btn = document.getElementById('promoApplyBtn');
+  const prevText = btn.textContent;
+  btn.textContent = '...';
+  btn.classList.add('disabled');
+
+  let errorEl = document.getElementById('promoError');
+  if(errorEl) errorEl.remove();
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('validate-promo', {
+      body: { init_data: initData, code }
+    });
+
+    if(error || !data?.valid){
+      showPromoError(data?.message || 'Промокод недействителен');
+      return;
+    }
+
+    state.appliedPromo = { code: (data.code || code).toUpperCase(), discountPercent: Number(data.discount_percent) };
+    renderPromoBox(p);
+    rerenderCheckout(p);
+  } catch(e){
+    console.error('validate-promo error:', e);
+    showPromoError('Не удалось проверить промокод. Попробуйте ещё раз');
+  } finally {
+    btn.textContent = prevText;
+    btn.classList.remove('disabled');
+  }
 }
 
 async function confirmPurchase(){
@@ -3323,7 +3462,8 @@ async function confirmPurchase(){
     return;
   }
 
-  const kcoinToUse = Math.max(0, Math.min(roundKcoin(state.pendingKcoinToUse||0), roundKcoin(p.price), roundKcoin(state.kcoinBalance||0)));
+  const kcoinToUse = Math.max(0, Math.min(roundKcoin(state.pendingKcoinToUse||0), roundKcoin(promoDiscountedPrice(p)), roundKcoin(state.kcoinBalance||0)));
+  const promoCode = state.appliedPromo?.code || null;
 
   try {
     const { data, error } = await supabaseClient.functions.invoke('create-order', {
@@ -3335,7 +3475,8 @@ async function confirmPurchase(){
         variant_index: p.variant_index,
         recipient: p.recipient,
         recipient2: p.recipient2,
-        kcoin_to_use: kcoinToUse
+        kcoin_to_use: kcoinToUse,
+        promo_code: promoCode
       }
     });
 
@@ -3345,7 +3486,8 @@ async function confirmPurchase(){
         insufficient_funds: 'Недостаточно средств',
         unauthorized: 'Не удалось подтвердить пользователя Telegram',
         invalid_params: 'Некорректные данные заказа',
-        profile_not_found: 'Профиль не найден'
+        profile_not_found: 'Профиль не найден',
+        invalid_promo: 'Промокод недействителен или уже использован'
       };
       showToast(messages[code] || 'Не удалось оформить заказ. Попробуйте ещё раз');
       return;
@@ -3361,11 +3503,18 @@ async function confirmPurchase(){
     const kcoinUsedFinal = Number(data.kcoin_used || 0);
     const cashbackFinal = Number(data.cashback || 0);
     p.kcoinUsedFinal = kcoinUsedFinal; // сколько реально списал сервер — источник правды для чека
+    // Итоговая цена/промокод — берём из ответа сервера, если он их прислал
+    // (после обновления create-order), иначе показываем то, что посчитали
+    // на клиенте, чтобы чек не сломался, пока функция ещё не обновлена.
+    p.priceAfterPromoFinal = data.price != null ? Number(data.price) : promoDiscountedPrice(p);
+    p.promoCodeFinal = data.promo_code || promoCode || null;
+    p.promoDiscountPercentFinal = data.promo_discount_percent != null ? Number(data.promo_discount_percent) : state.appliedPromo?.discountPercent || null;
     state.pendingKcoinToUse = 0;
+    state.appliedPromo = null;
     state.orders.unshift({
       id, cat:p.cat, glyph:p.glyph, title:p.title, recipient:p.recipient,
       recipient2:p.recipient2, field2Label:p.field2Label,
-      price:p.price, kcoinUsed:kcoinUsedFinal, cashback:cashbackFinal,
+      price:p.priceAfterPromoFinal, kcoinUsed:kcoinUsedFinal, cashback:cashbackFinal,
       status:'processing', reviewDismissed:false, createdAt:new Date().toISOString(), date:fmtDate()
     });
     // Настоящее состояние (в т.ч. статус/возврат) подтянется из Supabase
