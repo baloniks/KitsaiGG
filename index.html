@@ -1525,6 +1525,14 @@ const CATALOG_SUBCATEGORIES = {
 // type:'more-item' → открывает выбор срока/варианта (например Telegram Premium)
 // type:'list-item' → открывает карточку конкретного товара; listKey/itemId указывают на LIST_CONFIG
 let CATALOG_ITEMS = [];
+function shuffleArray(arr){
+  const result = arr.slice();
+  for(let i = result.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 // Строка из таблицы products → внутренние структуры RATE_CONFIG/MORE_ITEM_CONFIG/
 // LIST_CONFIG/CATALOG_ITEMS, которые использует остальной код приложения.
@@ -1729,7 +1737,7 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '', imageUrl: row.image_url || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'rate', key: row.id
+        type: 'rate', key: row.id, sortOrder: row.sort_order
       });
       PRODUCTS_BY_ID[row.id] = { type: 'rate', key: row.id };
 
@@ -1773,7 +1781,7 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '', imageUrl: row.image_url || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'more-item', key: row.id
+        type: 'more-item', key: row.id, sortOrder: row.sort_order
       });
       PRODUCTS_BY_ID[row.id] = { type: 'more-item', key: row.id };
 
@@ -1839,11 +1847,38 @@ function buildProductConfigs(rows){
       CATALOG_ITEMS.push({
         title: row.title, sub: row.sub || '', glyph: row.glyph || '', imageUrl: row.image_url || '',
         category: row.category, subcats: row.subcats || [],
-        type: 'list-item', listKey: groupKey, itemId: row.id
+        type: 'list-item', listKey: groupKey, itemId: row.id, sortOrder: row.sort_order
       });
       PRODUCTS_BY_ID[row.id] = { type: 'list-item', listKey: groupKey, itemId: row.id };
     }
   });
+
+  // Порядок товаров: группируем по значению sort_order (у кого оно задано —
+  // ставим согласно нему по возрастанию, значение поменьше — выше), а внутри
+  // одной и той же группы (одинаковый sort_order, включая товары без явного
+  // приоритета) — перемешиваем случайно. Так конкретный товар со своим
+  // уникальным/низким sort_order (например 1) всегда оказывается наверху и
+  // на том же месте при поиске и в любой категории, а остальные товары —
+  // в случайном порядке, который заново перемешивается при каждом заходе.
+  CATALOG_ITEMS = randomizeWithPinnedOrder(CATALOG_ITEMS);
+}
+
+// См. комментарий выше buildProductConfigs. sort_order без значения (null/
+// undefined) считается "без приоритета" и группируется вместе — такие
+// товары всегда идут после тех, у кого sort_order задан явно.
+function randomizeWithPinnedOrder(items){
+  const groups = new Map();
+  items.forEach(item => {
+    const key = (item.sortOrder === null || item.sortOrder === undefined) ? Infinity : Number(item.sortOrder);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  const orderedKeys = Array.from(groups.keys()).sort((a, b) => a - b);
+  const result = [];
+  orderedKeys.forEach(key => {
+    result.push(...shuffleArray(groups.get(key)));
+  });
+  return result;
 }
 
 // Загружает товары из таблицы products в Supabase и перестраивает каталог.
