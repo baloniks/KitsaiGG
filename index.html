@@ -3615,6 +3615,8 @@ async function loadOrders(){
       price: Number(row.price_rub) || 0,
       kcoinUsed: Number(row.kcoin_used) || 0,
       cashback: Number(row.cashback) || 0,
+      promoCode: row.promo_code || null,
+      promoDiscountPercent: row.promo_discount_percent != null ? Number(row.promo_discount_percent) : null,
       status: row.status || 'processing',
       reviewDismissed: !!row.review_dismissed,
       createdAt: row.created_at,
@@ -3679,6 +3681,7 @@ function orderReceiptHTML(o){
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${o.title}</span></div>
     ${o.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${o.recipient}</span></div>` : ''}
     ${o.recipient2 ? `<div class="receipt-row"><span>${o.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${o.recipient2}</span></div>` : ''}
+    ${o.promoCode ? `<div class="receipt-row"><span>Промокод ${o.promoCode}</span><span class="fill"></span><span class="value" style="color:var(--green)">− ${o.promoDiscountPercent}%</span></div>` : ''}
     ${o.kcoinUsed>0 ? `<div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${o.kcoinUsed.toLocaleString('ru-RU')} KC</span></div>` : ''}
     ${o.cashback>0 ? `<div class="receipt-row"><span>Начислен кэшбек</span><span class="fill"></span><span class="value" style="color:var(--green)">+ ${o.cashback.toLocaleString('ru-RU')} KC</span></div>` : ''}
     <div class="rtotal"><span class="lbl">Итого</span><span class="val">${rub(o.price)}</span></div>
