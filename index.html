@@ -1525,6 +1525,32 @@ const CATALOG_SUBCATEGORIES = {
 // type:'more-item' → открывает выбор срока/варианта (например Telegram Premium)
 // type:'list-item' → открывает карточку конкретного товара; listKey/itemId указывают на LIST_CONFIG
 let CATALOG_ITEMS = [];
+
+// Экранирует спецсимволы HTML, чтобы текст из базы нельзя было случайно
+// (или специально) превратить в произвольную разметку/скрипт.
+function escapeHtml(str){
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Рендерит описание товара (description/description2) в безопасный HTML:
+// текст экранируется целиком, а затем в нём распознаётся markdown-синтаксис
+// ссылки вида [нужное слово](https://ссылка) и превращается в кликабельную
+// ссылку, открывающуюся в новой вкладке. Всё остальное остаётся обычным
+// текстом. Перенос строк сохраняется за счёт white-space:pre-line у
+// .product-description в CSS — сами \n сохранять не нужно.
+// Пример в поле description в Supabase:
+//   Подробнее в нашем канале: [подпишитесь здесь](https://t.me/kitsaigg)
+function renderDescriptionHtml(text){
+  const escaped = escapeHtml(text || '');
+  return escaped.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s()]+)\)/g,
+    (match, label, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+}
+
 function shuffleArray(arr){
   const result = arr.slice();
   for(let i = result.length - 1; i > 0; i--){
@@ -2405,13 +2431,13 @@ function renderRateProduct(cat){
   document.getElementById('rateUsername2').placeholder = cfg.fieldPlaceholder2 || '';
   document.getElementById('rateUsername2').value = '';
   const rateDesc = document.getElementById('rateDescription');
-  rateDesc.textContent = cfg.description;
+  rateDesc.innerHTML = renderDescriptionHtml(cfg.description);
   rateDesc.style.display = cfg.description ? '' : 'none';
   const rateDescTitle = document.getElementById('rateDescriptionTitle');
   rateDescTitle.textContent = cfg.descriptionTitle;
   rateDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
   const rateDesc2 = document.getElementById('rateDescription2');
-  document.getElementById('rateDescription2Text').textContent = cfg.description2;
+  document.getElementById('rateDescription2Text').innerHTML = renderDescriptionHtml(cfg.description2);
   rateDesc2.style.display = cfg.description2 ? '' : 'none';
   setupConsent('rate', cfg.title, !!cfg.description, updateRateSummary, cfg.consentText);
   document.getElementById('rateUsername').value = '';
@@ -2557,13 +2583,13 @@ function renderPremiumProduct(id){
   document.getElementById('premiumPlanLabel').textContent = cfg.planLabel;
   document.getElementById('premiumHint').textContent = cfg.hint;
   const premiumDesc = document.getElementById('premiumDescription');
-  premiumDesc.textContent = cfg.description;
+  premiumDesc.innerHTML = renderDescriptionHtml(cfg.description);
   premiumDesc.style.display = cfg.description ? '' : 'none';
   const premiumDescTitle = document.getElementById('premiumDescriptionTitle');
   premiumDescTitle.textContent = cfg.descriptionTitle;
   premiumDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
   const premiumDesc2 = document.getElementById('premiumDescription2');
-  document.getElementById('premiumDescription2Text').textContent = cfg.description2;
+  document.getElementById('premiumDescription2Text').innerHTML = renderDescriptionHtml(cfg.description2);
   premiumDesc2.style.display = cfg.description2 ? '' : 'none';
   setupConsent('premium', cfg.title, !!cfg.description, updatePremiumSummary, cfg.consentText);
   const grid = document.getElementById('premiumChips');
@@ -2886,7 +2912,7 @@ function renderItemDetail(item){
   document.getElementById('itemUsername2').placeholder = item.fieldPlaceholder2 || '';
   document.getElementById('itemUsername2').value = '';
   const itemDesc = document.getElementById('itemDescription');
-  itemDesc.textContent = item.description;
+  itemDesc.innerHTML = renderDescriptionHtml(item.description);
   itemDesc.style.display = item.description ? '' : 'none';
   const itemDescTitle = document.getElementById('itemDescriptionTitle');
   itemDescTitle.textContent = item.descriptionTitle;
@@ -2897,7 +2923,7 @@ function renderItemDetail(item){
   // только от того, задан ли сам заголовок.
   itemDescTitle.style.display = item.descriptionTitle ? '' : 'none';
   const itemDesc2 = document.getElementById('itemDescription2');
-  document.getElementById('itemDescription2Text').textContent = item.description2;
+  document.getElementById('itemDescription2Text').innerHTML = renderDescriptionHtml(item.description2);
   itemDesc2.style.display = item.description2 ? '' : 'none';
 
   // Товар с несколькими номиналами (variants) — рисуем чипы выбора,
