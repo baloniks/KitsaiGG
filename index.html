@@ -605,9 +605,11 @@
   .ref-link-row span{flex:1; font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .ref-link-row button{background:var(--accent); border:none; color:#fff; border-radius:8px; padding:7px 11px; font-size:11.5px; font-weight:600; cursor:pointer; flex-shrink:0;}
 
-  .promo-row{display:flex; gap:8px; margin-bottom:18px;}
-  .promo-row input{flex:1; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-mono); font-size:13px; outline:none;}
-  .promo-row button{background:var(--gold); border:none; color:#1a1200; font-weight:700; border-radius:var(--radius-sm); padding:0 16px; font-size:13px; cursor:pointer;}
+  .promo-row{display:flex; gap:8px; margin-bottom:18px; align-items:stretch;}
+  .promo-row input{flex:1; min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 13px; color:var(--text); font-family:var(--font-mono); font-size:13px; outline:none;}
+  .promo-row button{flex:none; background:var(--gold); border:none; color:#1a1200; font-weight:700; border-radius:var(--radius-sm); padding:12px 18px; font-size:13px; cursor:pointer; white-space:nowrap; transition:filter .1s, transform .1s;}
+  .promo-row button:active{transform:scale(.98); filter:brightness(.95);}
+  .promo-row button:disabled{opacity:.6; cursor:default;}
 
   /* ---------- Top-up ---------- */
   .paymethod{
@@ -852,7 +854,7 @@
       </div>
       <div class="promo-box" id="promoBox">
         <div class="promo-row" id="promoRowInput">
-          <input type="text" id="promoInput" placeholder="Промокод" autocomplete="off" autocapitalize="characters">
+          <input type="text" id="checkoutPromoInput" placeholder="Промокод" autocomplete="off" autocapitalize="characters">
           <button type="button" class="btn-secondary" id="promoApplyBtn" style="margin-top:0;">Применить</button>
         </div>
         <div class="promo-applied" id="promoApplied" style="display:none;">
@@ -1388,7 +1390,7 @@ const state = {
   pendingPurchase: null,
   // Промокод, применённый к текущему оформляемому заказу. null, пока не
   // введён/не подтверждён. { code, discountPercent } после успешной проверки
-  // через Edge Function validate-promo — см. applyPromoCode().
+  // через Edge Function validate-promo — см. applyCheckoutPromoCode().
   appliedPromo: null,
   navStack: ['catalog']
 };
@@ -3364,7 +3366,7 @@ function rerenderCheckout(p){
 }
 
 function renderPromoBox(p){
-  const input = document.getElementById('promoInput');
+  const input = document.getElementById('checkoutPromoInput');
   const applyBtn = document.getElementById('promoApplyBtn');
   const rowInput = document.getElementById('promoRowInput');
   const appliedBox = document.getElementById('promoApplied');
@@ -3377,8 +3379,8 @@ function renderPromoBox(p){
   rowInput.style.display = 'flex';
   appliedBox.style.display = 'none';
 
-  applyBtn.onclick = () => applyPromoCode(p);
-  input.onkeydown = (e) => { if(e.key === 'Enter') applyPromoCode(p); };
+  applyBtn.onclick = () => applyCheckoutPromoCode(p);
+  input.onkeydown = (e) => { if(e.key === 'Enter') applyCheckoutPromoCode(p); };
 
   removeBtn.onclick = () => {
     state.appliedPromo = null;
@@ -3404,8 +3406,8 @@ function showPromoError(msg){
   errorEl.textContent = msg;
 }
 
-async function applyPromoCode(p){
-  const input = document.getElementById('promoInput');
+async function applyCheckoutPromoCode(p){
+  const input = document.getElementById('checkoutPromoInput');
   const code = input.value.trim();
   if(!code){ showPromoError('Введите промокод'); return; }
 
