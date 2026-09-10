@@ -3816,7 +3816,7 @@ function renderOrders(filter='all'){
     <div class="order-item" data-order-id="${o.id}">
       <div class="glyph">${o.glyph}</div>
       <div class="meta"><h4>${o.title}</h4><span>${orderNumber(o.id)} · ${o.date}</span>${o.recipient2 ? `<span class="order-item-field2">${o.field2Label || 'Доп. поле'}: ${o.recipient2}</span>` : ''}</div>
-      <div class="right"><div class="price">${rub(o.price)}</div><div class="badge ${meta.badgeClass}">${meta.label}</div></div>
+      <div class="right"><div class="price">${rub(Math.max(0, o.price - (o.kcoinUsed || 0)))}</div><div class="badge ${meta.badgeClass}">${meta.label}</div></div>
       <div class="chevron">›</div>
     </div>
   `;
@@ -3833,8 +3833,18 @@ function filterOrders(f){
 }
 
 // Полный чек по конкретному заказу — что куплено, номер заказа в Supabase, статус, возврат.
+// ИСПРАВЛЕНО (баг: "Итого" в чеке заказа не учитывало списанный KCoin):
+// o.price — это цена товара УЖЕ СО СКИДКОЙ по промокоду (именно её присылает
+// и сохраняет create-order), но БЕЗ вычета KCoin — KCoin лишь частично
+// оплачивает эту сумму. Раньше в "Итого" выводился напрямую o.price, из-за
+// чего при одновременном использовании промокода И KCoin сумма в чеке была
+// завышена ровно на величину списанного KCoin. Теперь — как и во временном
+// чеке при оформлении (см. receiptHTML/rubDue) — "Итого к оплате" считается
+// как o.price минус o.kcoinUsed, а сама цена товара (со скидкой, если она
+// есть) показывается отдельной строкой "Цена".
 function orderReceiptHTML(o){
   const meta = orderStatusMeta(o.status);
+  const rubDue = Math.max(0, o.price - (o.kcoinUsed || 0));
   return `
     <div class="rhead">
       <div class="k">KitsaiGG</div>
@@ -3844,10 +3854,11 @@ function orderReceiptHTML(o){
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${o.title}</span></div>
     ${o.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${o.recipient}</span></div>` : ''}
     ${o.recipient2 ? `<div class="receipt-row"><span>${o.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${o.recipient2}</span></div>` : ''}
+    ${(o.promoCode || o.kcoinUsed>0) ? `<div class="receipt-row"><span>Цена</span><span class="fill"></span><span class="value">${rub(o.price)}</span></div>` : ''}
     ${o.promoCode ? `<div class="receipt-row"><span>Промокод ${o.promoCode}</span><span class="fill"></span><span class="value" style="color:var(--green)">− ${o.promoDiscountPercent}%</span></div>` : ''}
     ${o.kcoinUsed>0 ? `<div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${o.kcoinUsed.toLocaleString('ru-RU')} KC</span></div>` : ''}
     ${o.cashback>0 ? `<div class="receipt-row"><span>Начислен кэшбек</span><span class="fill"></span><span class="value" style="color:var(--green)">+ ${o.cashback.toLocaleString('ru-RU')} KC</span></div>` : ''}
-    <div class="rtotal"><span class="lbl">Итого</span><span class="val">${rub(o.price)}</span></div>
+    <div class="rtotal"><span class="lbl">Итого к оплате</span><span class="val">${rub(rubDue)}</span></div>
     ${meta.stampText ? `<div class="stamp ${meta.stampClass}">${meta.stampText}</div>` : ''}
     <div class="barcode">${Array.from({length:28}).map(()=>`<div style="height:${8+Math.random()*14}px;"></div>`).join('')}</div>
   `;
