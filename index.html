@@ -2581,6 +2581,33 @@ function setupConsent(prefix, title, hasDescription, onChange, customText){
   const checkbox = document.getElementById(prefix + 'Consent');
   checkbox.checked = false;
   checkbox.onchange = onChange;
+  // Блок согласия скрыт, пока пользователь не начал что-то вводить в поля
+  // этого товара (юзернейм/количество) — см. revealConsent/initConsentReveal ниже.
+  const wrap = document.getElementById(prefix + 'ConsentWrap');
+  if(wrap) wrap.style.display = 'none';
+}
+
+// Показывает блок согласия для указанного префикса ('rate' | 'premium' | 'item'),
+// как только пользователь начал вводить что-то в одно из полей этого товара.
+function revealConsent(prefix){
+  const wrap = document.getElementById(prefix + 'ConsentWrap');
+  if(wrap) wrap.style.display = '';
+}
+
+// Вешает разовые обработчики на текстовые/числовые поля указанных префиксов —
+// при первом же вводе символа показывается соответствующий блок согласия.
+function initConsentReveal(){
+  const fieldsByPrefix = {
+    rate: ['rateCustomInput', 'rateUsername', 'rateUsername2'],
+    premium: ['premiumUsername', 'premiumUsername2'],
+    item: ['itemUsername', 'itemUsername2']
+  };
+  Object.keys(fieldsByPrefix).forEach(prefix => {
+    fieldsByPrefix[prefix].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.addEventListener('input', () => revealConsent(prefix));
+    });
+  });
 }
 
 function renderRateProduct(cat){
@@ -4248,6 +4275,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('rateCustomInput').addEventListener('input', () => {
     applyCustomRateInput(RATE_CONFIG[state.currentCategory]);
   });
+  // Показ блока согласия только после начала ввода в поля товара
+  initConsentReveal();
   document.getElementById('premiumBuyBtn').addEventListener('click', () => attemptBuy('premium'));
   document.getElementById('btnItemBuy').addEventListener('click', () => attemptBuy('item'));
   document.getElementById('btnCheckoutCancel').addEventListener('click', goBack);
