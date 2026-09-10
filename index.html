@@ -275,6 +275,38 @@
   }
   .product-description-title + .product-description{margin-top:0;}
 
+  /* ---------- FAQ (частые вопросы) — аккордеон на карточке товара ---------- */
+  .faq-block{
+    margin-top:22px; margin-bottom:2px; padding-top:20px;
+    border-top:1px solid var(--border);
+  }
+  .faq-title{
+    font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent-2);
+    font-family:var(--font-mono); font-weight:600; margin-bottom:10px; text-align:center; white-space:normal;
+  }
+  .faq-item{
+    border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface);
+    margin-bottom:8px; overflow:hidden;
+  }
+  .faq-item:last-child{margin-bottom:0;}
+  .faq-question{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:12px 13px; cursor:pointer; font-size:12.5px; color:var(--text); line-height:1.4;
+    font-weight:500; -webkit-tap-highlight-color:transparent;
+  }
+  .faq-question .faq-arrow{
+    flex:none; font-size:11px; color:var(--text-faint); transition:transform .2s ease;
+  }
+  .faq-item.open .faq-question .faq-arrow{ transform:rotate(180deg); color:var(--accent-2); }
+  .faq-answer{
+    max-height:0; overflow:hidden; transition:max-height .25s ease;
+  }
+  .faq-answer-inner{
+    padding:0 13px 13px; font-size:12.5px; color:var(--text-muted); line-height:1.55;
+    white-space:pre-line; overflow-wrap:break-word; word-break:break-word;
+  }
+  .faq-item.open .faq-answer{ max-height:800px; }
+
   .consent-row{
     display:flex; align-items:flex-start; gap:9px; margin-top:14px;
     font-size:12px; color:var(--text-muted); line-height:1.45; cursor:pointer;
@@ -758,6 +790,10 @@
       <button class="btn-primary disabled" id="rateBuyBtn">Выберите сумму</button>
       <div class="product-description-title" id="rateDescriptionTitle" style="display:none;"></div>
       <div class="product-description" id="rateDescription" style="display:none;"></div>
+      <div class="faq-block" id="rateFaq" style="display:none;">
+        <div class="faq-title" id="rateFaqTitle"></div>
+        <div id="rateFaqItems"></div>
+      </div>
       <div class="product-description-block" id="rateDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
         <div class="product-description" id="rateDescription2Text"></div>
@@ -790,6 +826,10 @@
       <button class="btn-primary disabled" id="premiumBuyBtn">Выберите срок</button>
       <div class="product-description-title" id="premiumDescriptionTitle" style="display:none;"></div>
       <div class="product-description" id="premiumDescription" style="display:none;"></div>
+      <div class="faq-block" id="premiumFaq" style="display:none;">
+        <div class="faq-title" id="premiumFaqTitle"></div>
+        <div id="premiumFaqItems"></div>
+      </div>
       <div class="product-description-block" id="premiumDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
         <div class="product-description" id="premiumDescription2Text"></div>
@@ -841,6 +881,10 @@
       <button class="btn-primary" id="btnItemBuy">Купить</button>
       <div class="product-description-title" id="itemDescriptionTitle" style="display:none;"></div>
       <div class="product-description" id="itemDescription" style="display:none;"></div>
+      <div class="faq-block" id="itemFaq" style="display:none;">
+        <div class="faq-title" id="itemFaqTitle"></div>
+        <div id="itemFaqItems"></div>
+      </div>
       <div class="product-description-block" id="itemDescription2" style="display:none;">
         <div class="product-description-label">Описание</div>
         <div class="product-description" id="itemDescription2Text"></div>
@@ -1585,6 +1629,67 @@ function renderDescriptionHtml(text){
     (match, label, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
 }
 
+// Разбирает текст из колонки faq в список вопрос/ответ для блока FAQ на
+// карточке товара. Формат в Supabase: вопрос и ответ — это один "абзац",
+// вопрос — первая строка абзаца, всё остальное до пустой строки — ответ.
+// Абзацы (то есть отдельные вопросы) разделяются между собой пустой строкой.
+// Поддерживается тот же markdown-синтаксис ссылок [текст](https://...), что
+// и в description/description_2 (см. renderDescriptionHtml).
+// Пример в поле faq в Supabase:
+//   Как быстро придёт товар?
+//   Обычно от 5 до 15 минут после оплаты, в редких случаях — до 24 часов.
+//
+//   Нужен ли пароль от аккаунта?
+//   Нет, эту информацию мы никогда не запрашиваем.
+function parseFaqItems(text){
+  if(!text || !String(text).trim()) return [];
+  return String(text).split(/\n\s*\n/).map(block => {
+    const lines = block.split('\n');
+    const question = (lines.shift() || '').trim();
+    const answer = lines.join('\n').trim();
+    return question ? { question, answer } : null;
+  }).filter(Boolean);
+}
+
+// Отрисовывает блок «Частые вопросы» на карточке товара (общий для карточек
+// rate/more-item/list-item). prefix — 'rate' | 'premium' | 'item', ожидает в
+// разметке элементы <prefix>Faq (обёртка), <prefix>FaqTitle (заголовок),
+// <prefix>FaqItems (контейнер вопросов). Заголовок берётся из колонки
+// faq_title (свой текст для каждого товара), если она пуста — используется
+// заголовок по умолчанию. Если вопросов нет (колонка faq пуста) — блок
+// целиком скрыт, а следующий за ним блок description_2 (если он есть)
+// становится первым, то есть занимает освободившееся место.
+// Открыт может быть только один вопрос за раз — открытие следующего
+// закрывает предыдущий (обычное поведение аккордеона).
+function renderFaqBlock(prefix, faqTitle, faqItems){
+  const wrap = document.getElementById(prefix + 'Faq');
+  const titleEl = document.getElementById(prefix + 'FaqTitle');
+  const itemsEl = document.getElementById(prefix + 'FaqItems');
+  if(!faqItems || !faqItems.length){
+    wrap.style.display = 'none';
+    itemsEl.innerHTML = '';
+    return;
+  }
+  wrap.style.display = '';
+  titleEl.textContent = (faqTitle && faqTitle.trim()) ? faqTitle : 'Частые вопросы';
+  itemsEl.innerHTML = faqItems.map(item => `
+    <div class="faq-item">
+      <div class="faq-question">
+        <span>${renderDescriptionHtml(item.question)}</span>
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-answer"><div class="faq-answer-inner">${renderDescriptionHtml(item.answer)}</div></div>
+    </div>
+  `).join('');
+  itemsEl.querySelectorAll('.faq-item').forEach(el => {
+    el.querySelector('.faq-question').addEventListener('click', () => {
+      const wasOpen = el.classList.contains('open');
+      itemsEl.querySelectorAll('.faq-item.open').forEach(o => o.classList.remove('open'));
+      if(!wasOpen) el.classList.add('open');
+    });
+  });
+}
+
 function shuffleArray(arr){
   const result = arr.slice();
   for(let i = result.length - 1; i > 0; i--){
@@ -1695,6 +1800,27 @@ function shuffleArray(arr){
 //                          товара, ПОСЛЕ кнопки покупки (обычный description
 //                          остаётся на прежнем месте, до чекбокса согласия —
 //                          это независимое поле, заполняйте только если нужно).
+//   faq_title     text    — свой заголовок блока «Частые вопросы» для этого
+//                          товара (например «Вопросы о доставке»). Если
+//                          оставить пустым — используется заголовок по
+//                          умолчанию «Частые вопросы». Заголовок показывается,
+//                          только если заполнена колонка faq (см. ниже).
+//   faq           text    — сами вопросы и ответы для блока FAQ (аккордеон:
+//                          при клике на вопрос раскрывается ответ, при этом
+//                          ранее открытый вопрос автоматически закрывается).
+//                          Показывается СРАЗУ ПОСЛЕ кнопки покупки, перед
+//                          блоком description_2 — если description_2 у
+//                          товара не заполнен, FAQ просто занимает его место.
+//                          Формат: вопрос — первая строка, всё до пустой
+//                          строки — ответ; следующий вопрос отделяется от
+//                          предыдущего пустой строкой. Можно использовать тот
+//                          же markdown для ссылок [текст](https://...), что
+//                          и в description. Пример значения колонки faq:
+//                            Как быстро придёт товар?
+//                            Обычно от 5 до 15 минут после оплаты.
+//
+//                            Нужен ли пароль от аккаунта?
+//                            Нет, эту информацию мы не запрашиваем.
 function buildProductConfigs(rows){
   RATE_CONFIG = {};
   MORE_ITEM_CONFIG = {};
@@ -1734,6 +1860,8 @@ function buildProductConfigs(rows){
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
         description2: row.description_2 || '',
+        faqTitle: row.faq_title || '',
+        faqItems: parseFaqItems(row.faq),
         consentText: row.consent_text || '',
         hint: row.hint || '',
         qtyLabel: row.qty_label || 'Количество',
@@ -1815,6 +1943,8 @@ function buildProductConfigs(rows){
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
         description2: row.description_2 || '',
+        faqTitle: row.faq_title || '',
+        faqItems: parseFaqItems(row.faq),
         consentText: row.consent_text || '',
         // Название строки над ценой в блоке "Итого" (по умолчанию "Подписка").
         // Задаётся через колонку qty_label — для type='more-item' она больше
@@ -1871,6 +2001,8 @@ function buildProductConfigs(rows){
         needsField: !!(row.field_label && String(row.field_label).trim()),
         description: row.description || '',
         description2: row.description_2 || '',
+        faqTitle: row.faq_title || '',
+        faqItems: parseFaqItems(row.faq),
         consentText: row.consent_text || '',
         maxQty: row.max_qty != null ? Number(row.max_qty) : null,
         // Подпись строки "Цена за штуку" в блоке итогов на карточке товара —
@@ -2470,6 +2602,7 @@ function renderRateProduct(cat){
   const rateDescTitle = document.getElementById('rateDescriptionTitle');
   rateDescTitle.textContent = cfg.descriptionTitle;
   rateDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
+  renderFaqBlock('rate', cfg.faqTitle, cfg.faqItems);
   const rateDesc2 = document.getElementById('rateDescription2');
   document.getElementById('rateDescription2Text').innerHTML = renderDescriptionHtml(cfg.description2);
   rateDesc2.style.display = cfg.description2 ? '' : 'none';
@@ -2622,6 +2755,7 @@ function renderPremiumProduct(id){
   const premiumDescTitle = document.getElementById('premiumDescriptionTitle');
   premiumDescTitle.textContent = cfg.descriptionTitle;
   premiumDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
+  renderFaqBlock('premium', cfg.faqTitle, cfg.faqItems);
   const premiumDesc2 = document.getElementById('premiumDescription2');
   document.getElementById('premiumDescription2Text').innerHTML = renderDescriptionHtml(cfg.description2);
   premiumDesc2.style.display = cfg.description2 ? '' : 'none';
@@ -2956,6 +3090,7 @@ function renderItemDetail(item){
   // из-за этого условия просто не появлялся. Условие должно зависеть
   // только от того, задан ли сам заголовок.
   itemDescTitle.style.display = item.descriptionTitle ? '' : 'none';
+  renderFaqBlock('item', item.faqTitle, item.faqItems);
   const itemDesc2 = document.getElementById('itemDescription2');
   document.getElementById('itemDescription2Text').innerHTML = renderDescriptionHtml(item.description2);
   itemDesc2.style.display = item.description2 ? '' : 'none';
