@@ -794,10 +794,7 @@
         <label id="rateFieldLabel">Юзернейм получателя</label>
         <input type="text" id="rateUsername" placeholder="@username">
       </div>
-      <div class="field" id="rateFieldWrap2">
-        <label id="rateFieldLabel2">—</label>
-        <input type="text" id="rateUsername2" placeholder="">
-      </div>
+      <div id="rateFieldWrap2"></div>
       <div class="hint" id="rateHint">Аккаунт должен быть открыт для получения подарков.</div>
       <div class="order-bar">
         <div class="row"><span id="rateQtyLabel">Количество</span><span id="rateQtyVal">—</span></div>
@@ -830,10 +827,7 @@
         <label id="premiumFieldLabel">Юзернейм получателя</label>
         <input type="text" id="premiumUsername" placeholder="@username">
       </div>
-      <div class="field" id="premiumFieldWrap2">
-        <label id="premiumFieldLabel2">—</label>
-        <input type="text" id="premiumUsername2" placeholder="">
-      </div>
+      <div id="premiumFieldWrap2"></div>
       <div class="hint" id="premiumHint">Активация без пароля и без кода подтверждения.</div>
       <div class="order-bar">
         <div class="row"><span id="premiumPlanLabel">Подписка</span><span id="premiumPlanVal">—</span></div>
@@ -877,10 +871,7 @@
         <label id="itemFieldLabel">Куда доставить</label>
         <input type="text" id="itemUsername" placeholder="@username или ник в игре">
       </div>
-      <div class="field" id="itemFieldWrap2">
-        <label id="itemFieldLabel2">—</label>
-        <input type="text" id="itemUsername2" placeholder="">
-      </div>
+      <div id="itemFieldWrap2"></div>
       <div class="chip-grid" id="itemVariants" style="display:none; grid-template-columns:1fr 1fr 1fr; margin-top:12px;"></div>
       <div class="stepper-row" id="itemQtyWrap">
         <span style="font-size:13px; color:var(--text-muted);">Количество</span>
@@ -1923,10 +1914,8 @@ function buildProductConfigs(rows){
         qtyStep: row.qty_step != null && Number(row.qty_step) > 0 ? Number(row.qty_step) : 1,
         inputMode: row.input_mode === 'input' ? 'input' : 'chips',
         selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите сумму',
-        fieldLabel2: row.field_label_2 || '',
-        fieldPlaceholder2: row.field_placeholder_2 || '',
-        needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
-        usernameFormat2: normalizeUsernameFormat(row.username_format_2),
+        fields2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2),
+        needsField2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2).length > 0,
         usernameFormat: normalizeUsernameFormat(row.username_format),
         relatedLinks: parseRelatedLinks(row.related_links),
         // Как эта карточка выглядит САМА, когда показывается первой (слева,
@@ -2009,10 +1998,8 @@ function buildProductConfigs(rows){
         hint: row.hint != null ? row.hint : 'Активация без пароля и без кода подтверждения.',
         usernameFormat: normalizeUsernameFormat(row.username_format),
         selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите срок',
-        fieldLabel2: row.field_label_2 || '',
-        fieldPlaceholder2: row.field_placeholder_2 || '',
-        needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
-        usernameFormat2: normalizeUsernameFormat(row.username_format_2),
+        fields2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2),
+        needsField2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2).length > 0,
         relatedLinks: parseRelatedLinks(row.related_links),
         selfLinkIcon: parseSelfLink(row.related_self).icon || row.glyph || '',
         selfLinkLabel: parseSelfLink(row.related_self).label || row.title || '',
@@ -2064,10 +2051,8 @@ function buildProductConfigs(rows){
         unitPriceLabel: (row.qty_label && String(row.qty_label).trim()) ? row.qty_label : 'Цена за штуку',
         usernameFormat: normalizeUsernameFormat(row.username_format),
         selectPrompt: (row.select_prompt && String(row.select_prompt).trim()) ? row.select_prompt : 'Выберите вариант',
-        fieldLabel2: row.field_label_2 || '',
-        fieldPlaceholder2: row.field_placeholder_2 || '',
-        needsField2: !!(row.field_label_2 && String(row.field_label_2).trim()),
-        usernameFormat2: normalizeUsernameFormat(row.username_format_2),
+        fields2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2),
+        needsField2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2).length > 0,
         // Кросс-ссылки на другие товары для панели вверху карточки товара.
         // Колонка related_links в Supabase — jsonb-массив объектов вида
         // {"icon": "🎁", "label": "Подарочная карта", "product_id": "<id другого товара>"}.
@@ -2315,6 +2300,31 @@ const USERNAME_FORMAT_LABELS = {
 function normalizeUsernameFormat(v){
   const arr = Array.isArray(v) ? v : (v ? [v] : []);
   return arr.filter(f => USERNAME_FORMATS.includes(f));
+}
+
+// Разбирает "доп. поля" товара из СУЩЕСТВУЮЩИХ колонок field_label_2 /
+// field_placeholder_2 / username_format_2 — без добавления новых колонок в
+// Supabase. Можно указать сколько угодно полей:
+//   field_label_2:       "Сервер\nПароль от аккаунта\nID транзакции"
+//   field_placeholder_2: "например EU\nминимум 6 символов\n"
+//   username_format_2 (text[]): ['en', 'digits,en', '']
+// Каждая СТРОКА в field_label_2 — отдельное поле (в том порядке, в каком
+// написаны). Плейсхолдер и формат для поля N берутся по тому же индексу N
+// (плейсхолдер — N-я строка field_placeholder_2, формат — N-й элемент
+// массива username_format_2, где несколько форматов внутри одного элемента
+// перечисляются через запятую — работает как "ИЛИ", как и раньше).
+// Значения, которые пользователь введёт в эти поля при покупке, склеиваются
+// через перенос строки в ту же колонку recipient2, что и была.
+function parseExtraFields2(labelRaw, placeholderRaw, formatRaw){
+  const labels = String(labelRaw || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if(!labels.length) return [];
+  const placeholders = String(placeholderRaw || '').split('\n').map(s => s.trim());
+  const formatsArr = Array.isArray(formatRaw) ? formatRaw : [];
+  return labels.map((label, i) => ({
+    label,
+    placeholder: placeholders[i] || '',
+    formats: normalizeUsernameFormat(String(formatsArr[i] || '').split(',').map(s => s.trim()))
+  }));
 }
 
 // Проверка юзернейма по правилам Telegram: начинается с @, дальше только
@@ -2648,10 +2658,14 @@ function revealConsent(prefix){
 // Вешает разовые обработчики на текстовые/числовые поля указанных префиксов —
 // при первом же вводе символа показывается соответствующий блок согласия.
 function initConsentReveal(){
+  // rateUsername2/premiumUsername2/itemUsername2 больше не фиксированные —
+  // сколько их и есть ли они вообще, зависит от товара (см. fields2 /
+  // renderExtraFields2 ниже), поэтому слушатель на них вешается прямо там,
+  // в момент создания полей, а не здесь по фиксированному списку id.
   const fieldsByPrefix = {
-    rate: ['rateCustomInput', 'rateUsername', 'rateUsername2'],
-    premium: ['premiumUsername', 'premiumUsername2'],
-    item: ['itemUsername', 'itemUsername2']
+    rate: ['rateCustomInput', 'rateUsername'],
+    premium: ['premiumUsername'],
+    item: ['itemUsername']
   };
   Object.keys(fieldsByPrefix).forEach(prefix => {
     fieldsByPrefix[prefix].forEach(id => {
@@ -2659,6 +2673,79 @@ function initConsentReveal(){
       if(el) el.addEventListener('input', () => revealConsent(prefix));
     });
   });
+}
+
+// Строит N доп. полей получателя (label+input) внутри контейнера
+// containerId, по массиву fields (см. parseExtraFields2 — {label,
+// placeholder, formats}). Инпуты получают id вида `${prefix}Username2_0`,
+// `${prefix}Username2_1` и т.д. — по порядку, в том же порядке, в каком
+// строки перечислены в field_label_2 у товара. Если полей 0 — контейнер
+// просто остаётся пустым (никаких лишних отступов, т.к. у самого
+// контейнера нет класса field — margin даёт только каждое созданное поле).
+function renderExtraFields2(containerId, prefix, fields){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  container.innerHTML = '';
+  fields.forEach((f, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = f.label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = prefix + 'Username2_' + i;
+    input.placeholder = f.placeholder || '';
+    input.addEventListener('input', () => revealConsent(prefix));
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    container.appendChild(wrap);
+  });
+}
+
+// Собирает и валидирует значения полей, созданных renderExtraFields2.
+// Возвращает { ok:true, joined:'знач1\nзнач2\n...' } или { ok:false, msg }.
+// joined — то, что уходит в recipient2 (склеено переносом строки, в том же
+// порядке, что и подписи в field_label_2 — так бэкенд разбирает обратно).
+function collectExtraFields2(prefix, fields){
+  if(!fields.length) return { ok:true, joined:null };
+  const values = [];
+  for(let i=0; i<fields.length; i++){
+    const f = fields[i];
+    const el = document.getElementById(prefix + 'Username2_' + i);
+    const val = el ? el.value.trim() : '';
+    if(!val){ return { ok:false, msg:'Заполните поле «' + f.label + '»' }; }
+    const check = checkRecipientFormat(val, f.formats);
+    if(!check.ok){ return { ok:false, msg:check.msg }; }
+    values.push(val);
+  }
+  return { ok:true, joined: values.join('\n') };
+}
+
+// Склеенные подписи доп. полей для сохранения в заказе (field2Label) — те же
+// строки, что были в field_label_2 у товара, в том же порядке, что и
+// значения из collectExtraFields2 (recipient2). Бэкенд трактует их как
+// пары по индексу строки.
+function fields2LabelJoined(fields){
+  return fields.map(f => f.label).join('\n');
+}
+
+// Строки чека/уведомления для доп. полей — каждая пара label/значение своей
+// строкой. recipient2 и field2Label — оба склеены переносом строки, в одном
+// порядке (см. fields2LabelJoined/collectExtraFields2 выше).
+function extraFieldRowsHtml(recipient2, field2Label){
+  if(!recipient2) return '';
+  const labels = String(field2Label || '').split('\n').map(s => s.trim());
+  const values = String(recipient2).split('\n');
+  return values.map((v, i) => `<div class="receipt-row"><span>${labels[i] || 'Доп. поле'}</span><span class="fill"></span><span class="value">${v}</span></div>`).join('');
+}
+
+// То же самое, но в одну компактную строку через " · " — для карточки
+// заказа в списке (там и так ellipsis подрежет, если не влезет).
+function extraFieldSummaryLine(recipient2, field2Label){
+  if(!recipient2) return '';
+  const labels = String(field2Label || '').split('\n').map(s => s.trim());
+  const values = String(recipient2).split('\n');
+  return values.map((v, i) => (labels[i] || 'Доп. поле') + ': ' + v).join(' · ');
 }
 
 function renderRateProduct(cat){
@@ -2671,9 +2758,7 @@ function renderRateProduct(cat){
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('rateHint').textContent = cfg.hint;
   document.getElementById('rateFieldWrap2').style.display = cfg.needsField2 ? '' : 'none';
-  document.getElementById('rateFieldLabel2').textContent = cfg.fieldLabel2;
-  document.getElementById('rateUsername2').placeholder = cfg.fieldPlaceholder2 || '';
-  document.getElementById('rateUsername2').value = '';
+  renderExtraFields2('rateFieldWrap2', 'rate', cfg.fields2);
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.innerHTML = renderDescriptionHtml(cfg.description);
   rateDesc.style.display = cfg.description ? '' : 'none';
@@ -2822,9 +2907,7 @@ function renderPremiumProduct(id){
   document.getElementById('premiumUsername').placeholder = cfg.fieldPlaceholder || '@username';
   document.getElementById('premiumUsername').value = '';
   document.getElementById('premiumFieldWrap2').style.display = cfg.needsField2 ? '' : 'none';
-  document.getElementById('premiumFieldLabel2').textContent = cfg.fieldLabel2;
-  document.getElementById('premiumUsername2').placeholder = cfg.fieldPlaceholder2 || '';
-  document.getElementById('premiumUsername2').value = '';
+  renderExtraFields2('premiumFieldWrap2', 'premium', cfg.fields2);
   document.getElementById('premiumPlanLabel').textContent = cfg.planLabel;
   document.getElementById('premiumHint').textContent = cfg.hint;
   const premiumDesc = document.getElementById('premiumDescription');
@@ -3154,9 +3237,7 @@ function renderItemDetail(item){
   document.getElementById('itemUsername').placeholder = item.fieldPlaceholder || '@username или ник в игре';
   document.getElementById('itemUsername').value = '';
   document.getElementById('itemFieldWrap2').style.display = item.needsField2 ? '' : 'none';
-  document.getElementById('itemFieldLabel2').textContent = item.fieldLabel2;
-  document.getElementById('itemUsername2').placeholder = item.fieldPlaceholder2 || '';
-  document.getElementById('itemUsername2').value = '';
+  renderExtraFields2('itemFieldWrap2', 'item', item.fields2);
   const itemDesc = document.getElementById('itemDescription');
   itemDesc.innerHTML = renderDescriptionHtml(item.description);
   itemDesc.style.display = item.description ? '' : 'none';
@@ -3327,20 +3408,14 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
-    let username2 = null;
-    if(cfg.needsField2){
-      username2 = document.getElementById('rateUsername2').value.trim();
-      if(!username2){ showToast('Заполните поле «' + cfg.fieldLabel2 + '»'); return; }
-      {
-        const check = checkRecipientFormat(username2, cfg.usernameFormat2);
-        if(!check.ok){ showToast(check.msg); return; }
-      }
-    }
+    const field2 = collectExtraFields2('rate', cfg.fields2);
+    if(!field2.ok){ showToast(field2.msg); return; }
+    const username2 = field2.joined;
     const total = round2(state.rateSelected * rateForQty(cfg, state.rateSelected));
     purchase = {
       cat: orderCategoryFromProduct(cfg.category, RATE_ORDER_CAT[state.currentCategory] || 'game'), glyph: cfg.glyph || (cfg.unit==='⭐'?'⭐':'🟩'),
       title: cfg.title + ' · ' + state.rateSelected.toLocaleString('ru-RU') + ' ' + cfg.unit,
-      recipient: username, recipient2: username2, field2Label: cfg.fieldLabel2, price: total,
+      recipient: username, recipient2: username2, field2Label: fields2LabelJoined(cfg.fields2), price: total,
       // price выше — только для локального отображения чека до ответа сервера;
       // реальную цену на бэкенде считает create-order по product_id + qty.
       product_id: state.currentCategory,
@@ -3359,19 +3434,13 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
-    let username2 = null;
-    if(moreItemCfg.needsField2){
-      username2 = document.getElementById('premiumUsername2').value.trim();
-      if(!username2){ showToast('Заполните поле «' + moreItemCfg.fieldLabel2 + '»'); return; }
-      {
-        const check = checkRecipientFormat(username2, moreItemCfg.usernameFormat2);
-        if(!check.ok){ showToast(check.msg); return; }
-      }
-    }
+    const field2 = collectExtraFields2('premium', moreItemCfg.fields2);
+    if(!field2.ok){ showToast(field2.msg); return; }
+    const username2 = field2.joined;
     const plan = moreItemCfg.plans[state.premiumSelected];
     purchase = {
       cat: orderCategoryFromProduct(moreItemCfg.category, MORE_ITEM_ORDER_CAT[state.currentCategory] || 'services'), glyph: moreItemCfg.glyph || '💎', title: moreItemCfg.title + ' · ' + plan.label,
-      recipient: username, recipient2: username2, field2Label: moreItemCfg.fieldLabel2, price: variantPrice(plan),
+      recipient: username, recipient2: username2, field2Label: fields2LabelJoined(moreItemCfg.fields2), price: variantPrice(plan),
       product_id: state.currentCategory,
       plan_index: state.premiumSelected
     };
@@ -3388,21 +3457,15 @@ function attemptBuy(type){
         if(!check.ok){ showToast(check.msg); return; }
       }
     }
-    let username2 = null;
-    if(item.needsField2){
-      username2 = document.getElementById('itemUsername2').value.trim();
-      if(!username2){ showToast('Заполните поле «' + item.fieldLabel2 + '»'); return; }
-      {
-        const check = checkRecipientFormat(username2, item.usernameFormat2);
-        if(!check.ok){ showToast(check.msg); return; }
-      }
-    }
+    const field2 = collectExtraFields2('item', item.fields2);
+    if(!field2.ok){ showToast(field2.msg); return; }
+    const username2 = field2.joined;
     const variant = item.variants ? item.variants[state.itemVariantSelected] : null;
     const unitPrice = variant ? variantPrice(variant) : item.price;
     purchase = {
       cat:'key', glyph:item.glyph,
       title: item.title + (variant ? ' · ' + variant.label : '') + (state.itemQty>1 ? ' × '+state.itemQty : ''),
-      recipient: username, recipient2: username2, field2Label: item.fieldLabel2, price: unitPrice * state.itemQty,
+      recipient: username, recipient2: username2, field2Label: fields2LabelJoined(item.fields2), price: unitPrice * state.itemQty,
       product_id: item.id,
       qty: state.itemQty,
       variant_index: item.variants ? state.itemVariantSelected : null
@@ -3428,7 +3491,7 @@ function receiptHTML(p, id, stamped){
     </div>
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${p.title}</span></div>
     ${p.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${p.recipient}</span></div>` : ''}
-    ${p.recipient2 ? `<div class="receipt-row"><span>${p.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${p.recipient2}</span></div>` : ''}
+    ${extraFieldRowsHtml(p.recipient2, p.field2Label)}
     ${promoLabel ? `
     <div class="receipt-row"><span>Цена</span><span class="fill"></span><span class="value">${rub(p.price)}</span></div>
     <div class="receipt-row"><span>Промокод ${escapeHtml(promoLabel)}</span><span class="fill"></span><span class="value" style="color:var(--green)">− ${promoPercent}%</span></div>
@@ -3865,7 +3928,7 @@ function renderOrders(filter='all'){
     return `
     <div class="order-item" data-order-id="${o.id}">
       <div class="glyph">${o.glyph}</div>
-      <div class="meta"><h4>${o.title}</h4><span>${orderNumber(o.id)} · ${o.date}</span>${o.recipient2 ? `<span class="order-item-field2">${o.field2Label || 'Доп. поле'}: ${o.recipient2}</span>` : ''}</div>
+      <div class="meta"><h4>${o.title}</h4><span>${orderNumber(o.id)} · ${o.date}</span>${o.recipient2 ? `<span class="order-item-field2">${extraFieldSummaryLine(o.recipient2, o.field2Label)}</span>` : ''}</div>
       <div class="right"><div class="price">${rub(Math.max(0, o.price - (o.kcoinUsed || 0)))}</div><div class="badge ${meta.badgeClass}">${meta.label}</div></div>
       <div class="chevron">›</div>
     </div>
@@ -3903,7 +3966,7 @@ function orderReceiptHTML(o){
     <div class="receipt-row"><span>ID заказа</span><span class="fill"></span><span class="value copy-id" data-copy="${o.id}" style="font-family:var(--font-mono); font-size:10.5px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;">${o.id}</span></div>
     <div class="receipt-row"><span>Товар</span><span class="fill"></span><span class="value">${o.title}</span></div>
     ${o.recipient ? `<div class="receipt-row"><span>Получатель</span><span class="fill"></span><span class="value">${o.recipient}</span></div>` : ''}
-    ${o.recipient2 ? `<div class="receipt-row"><span>${o.field2Label || 'Доп. поле'}</span><span class="fill"></span><span class="value">${o.recipient2}</span></div>` : ''}
+    ${extraFieldRowsHtml(o.recipient2, o.field2Label)}
     ${(o.promoCode || o.kcoinUsed>0) ? `<div class="receipt-row"><span>Цена</span><span class="fill"></span><span class="value">${rub(o.price)}</span></div>` : ''}
     ${o.promoCode ? `<div class="receipt-row"><span>Промокод ${o.promoCode}</span><span class="fill"></span><span class="value" style="color:var(--green)">− ${o.promoDiscountPercent}%</span></div>` : ''}
     ${o.kcoinUsed>0 ? `<div class="receipt-row"><span>Оплачено KCoin</span><span class="fill"></span><span class="value" style="color:var(--gold)">− ${o.kcoinUsed.toLocaleString('ru-RU')} KC</span></div>` : ''}
