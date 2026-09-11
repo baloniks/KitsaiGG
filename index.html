@@ -193,6 +193,27 @@
   }
   .chip.selected .amt{color:var(--accent-2);}
 
+  /* ---------- Способ оплаты (пополнение) ---------- */
+  .method-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:2px;}
+  .method-card{
+    border:1px solid var(--border); background:var(--surface);
+    border-radius:var(--radius-sm); padding:12px 10px;
+    text-align:center; cursor:pointer; transition:all .12s;
+    box-shadow:var(--shadow-card);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    min-height:56px; gap:3px;
+  }
+  .method-card * { pointer-events: none; }
+  .method-card:active{transform:scale(.96);}
+  .method-card .method-name{font-family:var(--font-display); font-weight:600; font-size:13.5px;}
+  .method-card .method-fee{font-size:10.5px; color:var(--text-faint);}
+  .method-card.selected{
+    border-color:var(--accent); background:var(--accent-soft);
+    box-shadow:0 0 0 1px var(--accent) inset;
+  }
+  .method-card.selected .method-name{color:var(--accent-2);}
+  .method-card.selected .method-fee{color:var(--accent-2);}
+
   /* ---------- Related products (кросс-ссылки на карточке товара) ---------- */
   .related-links{
     display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; margin-bottom:14px;
@@ -1331,10 +1352,22 @@
 • Tonkeeper - TON или USDT (TRC20, TON). Пополнение на любую сумму.
 • Перевод по СБП. Пополнение на любую сумму. Выполняется в течение 12 часов.
 
-💳 CryptoBot - автоматическое пополнение
-+5% комиссия • Пополнение на любую сумму и валюту</div>
+💳 Автоматическое пополнение — CryptoBot (+4%) или Lave Pay (+2%). Пополнение на любую сумму и валюту</div>
       </div>
-      <div class="section-label" style="margin-top:0;">Сумма пополнения</div>
+
+      <div class="section-label" style="margin-top:0;">Способ оплаты</div>
+      <div class="method-grid" id="topupMethods">
+        <div class="method-card" data-method="cryptobot">
+          <div class="method-name">CryptoBot</div>
+          <div class="method-fee">Комиссия 4%</div>
+        </div>
+        <div class="method-card" data-method="lavepay">
+          <div class="method-name">Lave Pay</div>
+          <div class="method-fee">Комиссия 2%</div>
+        </div>
+      </div>
+
+      <div class="section-label">Сумма пополнения</div>
       <div class="chip-grid" id="topupChips"></div>
       <div class="field">
         <label>Или введите свою сумму ($)</label>
@@ -1432,6 +1465,10 @@ const state = {
   itemQty: 1,
   itemVariantSelected: null,
   topupAmount: null,
+  // Выбранный способ автоматического пополнения — 'cryptobot' или 'lavepay'.
+  // Определяет и наценку (см. PAYMENT_METHODS), и то, какую Edge Function
+  // дёрнет confirmTopup().
+  topupMethod: 'cryptobot',
   pendingPurchase: null,
   // Промокод, применённый к текущему оформляемому заказу. null, пока не
   // введён/не подтверждён. { code, discountPercent } после успешной проверки
@@ -1462,6 +1499,14 @@ const GROUP_TITLES = {
 };
 
 const TOPUP_AMOUNTS = [1,5,10,25,50,100];
+
+// Способы автоматического пополнения. feeRate — наша наценка сверх суммы,
+// которая зачислится на баланс (см. комментарий в confirmTopup). functionName —
+// какую Supabase Edge Function дёргать при подтверждении.
+const PAYMENT_METHODS = {
+  cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
+  lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
+};
 
 /* ---------------- REVIEW BANNER (предложение оставить отзыв в TG-группе) ---------------- */
 // Ссылка на группу отзывов
@@ -3947,7 +3992,18 @@ function selectTopupCustom(){
   updateTopupBtn();
 }
 
-const TOPUP_FEE_RATE = 0.05; // комиссия CryptoBot — 5%
+function selectTopupMethod(method){
+  if(!PAYMENT_METHODS[method]) return;
+  state.topupMethod = method;
+  syncTopupMethods();
+  updateTopupBtn();
+}
+
+function syncTopupMethods(){
+  document.querySelectorAll('#topupMethods .method-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.method === state.topupMethod);
+  });
+}
 
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
@@ -3956,7 +4012,8 @@ function updateTopupBtn(){
     btn.textContent = 'Пополнить баланс';
     btn.classList.remove('disabled');
 
-    const totalDue = round2(state.topupAmount * (1 + TOPUP_FEE_RATE));
+    const feeRate = PAYMENT_METHODS[state.topupMethod].feeRate;
+    const totalDue = round2(state.topupAmount * (1 + feeRate));
     feeNote.textContent = `К оплате ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}$`;
     feeNote.style.display = 'block';
   } else {
@@ -3966,10 +4023,11 @@ function updateTopupBtn(){
   }
 }
 
-// Создаёт счёт в CryptoBot через Edge Function create-invoice и открывает
-// страницу оплаты. Само зачисление баланса произойдёт позже, отдельно,
-// когда CryptoBot пришлёт вебхук crypto-webhook после реальной оплаты —
-// здесь мы только создаём счёт и переводим пользователя платить.
+// Создаёт счёт через Edge Function выбранного способа оплаты (CryptoBot или
+// Lave Pay — см. PAYMENT_METHODS) и открывает страницу оплаты. Само
+// зачисление баланса произойдёт позже, отдельно, когда платёжный сервис
+// пришлёт вебхук после реальной оплаты — здесь мы только создаём счёт и
+// переводим пользователя платить.
 async function confirmTopup(){
   if(!state.topupAmount || state.topupAmount <= 0) return;
 
@@ -3986,11 +4044,13 @@ async function confirmTopup(){
     return;
   }
 
+  const method = PAYMENT_METHODS[state.topupMethod] || PAYMENT_METHODS.cryptobot;
+
   btn.textContent = 'Создаём счёт...';
   btn.classList.add('disabled');
 
   try {
-    const { data, error } = await supabaseClient.functions.invoke('create-invoice', {
+    const { data, error } = await supabaseClient.functions.invoke(method.functionName, {
       body: {
         init_data: initData,
         amount_rub: state.topupAmount
@@ -4003,6 +4063,7 @@ async function confirmTopup(){
         bad_amount: 'Некорректная сумма пополнения',
         unauthorized: 'Не удалось подтвердить пользователя Telegram',
         cryptobot_error: 'CryptoBot временно недоступен. Попробуйте позже',
+        lavepay_error: 'Lave Pay временно недоступен. Попробуйте позже',
         db_error: 'Не удалось создать счёт. Попробуйте ещё раз'
       };
       showToast(messages[code] || 'Не удалось создать счёт. Попробуйте ещё раз');
@@ -4016,7 +4077,7 @@ async function confirmTopup(){
 
     openExternalLink(data.pay_url);
   } catch(e){
-    console.error('create-invoice error:', e);
+    console.error(`${method.functionName} error:`, e);
     showToast('Не удалось создать счёт. Попробуйте ещё раз');
   } finally {
     updateTopupBtn();
@@ -4173,9 +4234,11 @@ async function applyPromoCode(){
 
 function openTopup(){
   state.topupAmount = null;
+  state.topupMethod = 'cryptobot';
   document.getElementById('topupCustom').value = '';
   renderTopupChips();
   syncTopupChips();
+  syncTopupMethods();
   updateTopupBtn();
   pushView('topup', {sub:true, title:'Пополнение баланса'});
 }
@@ -4302,6 +4365,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnProfileTopup').addEventListener('click', openTopup);
   document.getElementById('topupCustom').addEventListener('input', selectTopupCustom);
   document.getElementById('topupBtn').addEventListener('click', confirmTopup);
+  document.querySelectorAll('#topupMethods .method-card').forEach(card => {
+    card.addEventListener('click', () => selectTopupMethod(card.dataset.method));
+  });
   // Автопополнение снова включено: кнопка вызывает confirmTopup(), которая
   // создаёт счёт через create-invoice (Edge Function) и открывает оплату в CryptoBot.
 
