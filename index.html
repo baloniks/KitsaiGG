@@ -264,6 +264,29 @@
   .field input:focus{border-color:var(--accent);}
   .field .hint, .hint{font-size:11px; color:var(--text-faint); margin-top:6px; line-height:1.4; overflow-wrap:break-word; word-break:break-word;}
 
+  /* Кастомный выпадающий список для доп. полей (см. parseExtraFields2 —
+     "select:Вариант1,Вариант2" в username_format_2). Оформление повторяет
+     .field input, чтобы выглядеть как часть той же формы. */
+  .kg-select{position:relative;}
+  .kg-select-trigger{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm);
+    padding:12px 13px; color:var(--text); font-family:var(--font-mono); font-size:14px;
+    font-weight:600; cursor:pointer; text-align:left;
+  }
+  .kg-select.open .kg-select-trigger{border-color:var(--accent);}
+  .kg-select-value.kg-select-placeholder{color:var(--text-muted); font-weight:400;}
+  .kg-select-chevron{color:var(--text-muted); font-size:12px; flex-shrink:0; transition:transform .15s;}
+  .kg-select.open .kg-select-chevron{transform:rotate(180deg);}
+  .kg-select-list{
+    position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:30;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+    overflow:hidden; box-shadow:var(--shadow-card);
+  }
+  .kg-select-option{padding:12px 13px; font-size:14px; color:var(--text); cursor:pointer;}
+  .kg-select-option:hover, .kg-select-option.selected{background:var(--surface-3);}
+  .kg-select-option + .kg-select-option{border-top:1px solid var(--border);}
+
   .note-box{
     margin-top:16px; background:var(--surface); border:1px dashed var(--border);
     border-radius:var(--radius-sm); padding:11px 12px; font-size:11.5px; color:var(--text-muted); line-height:1.5;
@@ -1837,6 +1860,12 @@ function shuffleArray(arr){
 //                          так же и с теми же значениями, что и username_format
 //                          (см. выше), но применяется отдельно ко второму полю
 //                          и не зависит от того, что выбрано в первом.
+//                          СПЕЦЗНАЧЕНИЕ: если элемент начинается с "select:",
+//                          например "select:Европа,Азия,Америка,SEA" — поле
+//                          с этим индексом становится выпадающим списком
+//                          (а не текстовым инпутом), варианты — через запятую
+//                          прямо в этой строке. Ничего мигрировать не нужно —
+//                          та же колонка, что и раньше (см. parseExtraFields2).
 //   description_2 text     — доп. описание, которое показывается отдельным
 //                          блоком с подписью «Описание» в самом низу карточки
 //                          товара, ПОСЛЕ кнопки покупки (обычный description
@@ -2320,12 +2349,39 @@ function parseExtraFields2(labelRaw, placeholderRaw, formatRaw){
   if(!labels.length) return [];
   const placeholders = String(placeholderRaw || '').split('\n').map(s => s.trim());
   const formatsArr = Array.isArray(formatRaw) ? formatRaw : [];
-  return labels.map((label, i) => ({
-    label,
-    placeholder: placeholders[i] || '',
-    formats: normalizeUsernameFormat(String(formatsArr[i] || '').split(',').map(s => s.trim()))
-  }));
+  return labels.map((label, i) => {
+    const rawFormat = String(formatsArr[i] || '').trim();
+    // "select:Вариант1,Вариант2,..." в username_format_2 — поле становится
+    // выпадающим списком с этими вариантами вместо текстового инпута.
+    // Варианты задаются прямо в этой же (уже существующей) колонке, без
+    // добавления новых колонок в Supabase — например для товара с полем
+    // "Сервер": username_format_2[i] = "select:Европа,Азия,Америка,SEA".
+    if(rawFormat.toLowerCase().startsWith('select:')){
+      const options = rawFormat.slice('select:'.length).split(',').map(s => s.trim()).filter(Boolean);
+      return { label, type: 'select', options, placeholder: placeholders[i] || label };
+    }
+    return {
+      label,
+      type: 'text',
+      placeholder: placeholders[i] || '',
+      formats: normalizeUsernameFormat(rawFormat.split(',').map(s => s.trim()))
+    };
+  });
 }
+
+// Закрывает все открытые кастомные select'ы (кроме переданного, если он есть).
+// Вызывается и глобальным кликом по документу (клик вне списка), и при
+// открытии одного select'а — чтобы одновременно был открыт только один.
+function closeAllKgSelects(except){
+  document.querySelectorAll('.kg-select.open').forEach(other => {
+    if(other !== except){
+      other.classList.remove('open');
+      const l = other.querySelector('.kg-select-list');
+      if(l) l.hidden = true;
+    }
+  });
+}
+document.addEventListener('click', () => closeAllKgSelects(null));
 
 // Проверка юзернейма по правилам Telegram: начинается с @, дальше только
 // латиница/цифры/подчёркивание, первый символ после @ — буква, длина 5-32.
@@ -2691,13 +2747,56 @@ function renderExtraFields2(containerId, prefix, fields){
     wrap.className = 'field';
     const label = document.createElement('label');
     label.textContent = f.label;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = prefix + 'Username2_' + i;
-    input.placeholder = f.placeholder || '';
-    input.addEventListener('input', () => revealConsent(prefix));
     wrap.appendChild(label);
-    wrap.appendChild(input);
+
+    if(f.type === 'select'){
+      // Кастомный выпадающий список (см. .kg-select в CSS) — выбранное
+      // значение хранится в data-value на самом контейнере, а не в input,
+      // поэтому collectExtraFields2 читает его именно оттуда.
+      const sel = document.createElement('div');
+      sel.className = 'kg-select';
+      sel.id = prefix + 'Field2Select_' + i;
+      sel.dataset.value = '';
+      sel.innerHTML =
+        '<button type="button" class="kg-select-trigger">' +
+          '<span class="kg-select-value kg-select-placeholder">' + escapeHtml(f.placeholder) + '</span>' +
+          '<span class="kg-select-chevron">⌄</span>' +
+        '</button>' +
+        '<div class="kg-select-list" hidden>' +
+          f.options.map(o => '<div class="kg-select-option" data-value="' + escapeHtml(o) + '">' + escapeHtml(o) + '</div>').join('') +
+        '</div>';
+      wrap.appendChild(sel);
+
+      const trigger = sel.querySelector('.kg-select-trigger');
+      const list = sel.querySelector('.kg-select-list');
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllKgSelects(sel);
+        const willOpen = !sel.classList.contains('open');
+        sel.classList.toggle('open', willOpen);
+        list.hidden = !willOpen;
+      });
+      sel.querySelectorAll('.kg-select-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sel.dataset.value = opt.dataset.value;
+          sel.querySelectorAll('.kg-select-option').forEach(o => o.classList.toggle('selected', o === opt));
+          const valueEl = sel.querySelector('.kg-select-value');
+          valueEl.textContent = opt.dataset.value;
+          valueEl.classList.remove('kg-select-placeholder');
+          sel.classList.remove('open');
+          list.hidden = true;
+          revealConsent(prefix);
+        });
+      });
+    } else {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = prefix + 'Username2_' + i;
+      input.placeholder = f.placeholder || '';
+      input.addEventListener('input', () => revealConsent(prefix));
+      wrap.appendChild(input);
+    }
     container.appendChild(wrap);
   });
 }
@@ -2711,6 +2810,13 @@ function collectExtraFields2(prefix, fields){
   const values = [];
   for(let i=0; i<fields.length; i++){
     const f = fields[i];
+    if(f.type === 'select'){
+      const sel = document.getElementById(prefix + 'Field2Select_' + i);
+      const val = sel ? sel.dataset.value : '';
+      if(!val){ return { ok:false, msg:'Выберите «' + f.label + '»' }; }
+      values.push(val);
+      continue;
+    }
     const el = document.getElementById(prefix + 'Username2_' + i);
     const val = el ? el.value.trim() : '';
     if(!val){ return { ok:false, msg:'Заполните поле «' + f.label + '»' }; }
