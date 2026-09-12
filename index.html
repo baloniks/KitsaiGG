@@ -1690,8 +1690,11 @@ function escapeHtml(str){
 //   Подробнее в нашем канале: [подпишитесь здесь](https://t.me/kitsaigg)
 function renderDescriptionHtml(text){
   const escaped = escapeHtml(text || '');
-  return escaped.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s()]+)\)/g,
+  const withLinks = escaped.replace(/\[([^\[\]]+)\]\((https?:\/\/[^\s()]+)\)/g,
     (match, label, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+  // **текст** → <strong>текст</strong>. Работает поверх уже экранированного
+  // текста, поэтому безопасно для любого пользовательского ввода из Supabase.
+  return withLinks.replace(/\*\*([^*]+)\*\*/g, (match, bold) => `<strong>${bold}</strong>`);
 }
 
 // Разбирает текст из колонки faq в список вопрос/ответ для блока FAQ на
@@ -1736,7 +1739,7 @@ function renderFaqBlock(prefix, faqTitle, faqItems){
     return;
   }
   wrap.style.display = '';
-  titleEl.textContent = (faqTitle && faqTitle.trim()) ? faqTitle : 'Частые вопросы';
+  titleEl.innerHTML = renderDescriptionHtml((faqTitle && faqTitle.trim()) ? faqTitle : 'Частые вопросы');
   itemsEl.innerHTML = faqItems.map(item => `
     <div class="faq-item">
       <div class="faq-question">
@@ -2869,14 +2872,14 @@ function renderRateProduct(cat){
   document.getElementById('rateFieldWrap').style.display = cfg.needsField ? '' : 'none';
   document.getElementById('rateFieldLabel').textContent = cfg.fieldLabel;
   document.getElementById('rateUsername').placeholder = cfg.fieldPlaceholder || '@username';
-  document.getElementById('rateHint').textContent = cfg.hint;
+  document.getElementById('rateHint').innerHTML = renderDescriptionHtml(cfg.hint);
   document.getElementById('rateFieldWrap2').style.display = cfg.needsField2 ? '' : 'none';
   renderExtraFields2('rateFieldWrap2', 'rate', cfg.fields2);
   const rateDesc = document.getElementById('rateDescription');
   rateDesc.innerHTML = renderDescriptionHtml(cfg.description);
   rateDesc.style.display = cfg.description ? '' : 'none';
   const rateDescTitle = document.getElementById('rateDescriptionTitle');
-  rateDescTitle.textContent = cfg.descriptionTitle;
+  rateDescTitle.innerHTML = renderDescriptionHtml(cfg.descriptionTitle);
   rateDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
   renderFaqBlock('rate', cfg.faqTitle, cfg.faqItems);
   const rateDesc2 = document.getElementById('rateDescription2');
@@ -3022,12 +3025,12 @@ function renderPremiumProduct(id){
   document.getElementById('premiumFieldWrap2').style.display = cfg.needsField2 ? '' : 'none';
   renderExtraFields2('premiumFieldWrap2', 'premium', cfg.fields2);
   document.getElementById('premiumPlanLabel').textContent = cfg.planLabel;
-  document.getElementById('premiumHint').textContent = cfg.hint;
+  document.getElementById('premiumHint').innerHTML = renderDescriptionHtml(cfg.hint);
   const premiumDesc = document.getElementById('premiumDescription');
   premiumDesc.innerHTML = renderDescriptionHtml(cfg.description);
   premiumDesc.style.display = cfg.description ? '' : 'none';
   const premiumDescTitle = document.getElementById('premiumDescriptionTitle');
-  premiumDescTitle.textContent = cfg.descriptionTitle;
+  premiumDescTitle.innerHTML = renderDescriptionHtml(cfg.descriptionTitle);
   premiumDescTitle.style.display = (cfg.description && cfg.descriptionTitle) ? '' : 'none';
   renderFaqBlock('premium', cfg.faqTitle, cfg.faqItems);
   const premiumDesc2 = document.getElementById('premiumDescription2');
@@ -3242,7 +3245,7 @@ function renderWarningBox(boxId, textId, text){
     box.style.display = 'none';
     return;
   }
-  document.getElementById(textId).textContent = trimmed;
+  document.getElementById(textId).innerHTML = renderDescriptionHtml(trimmed);
   box.style.display = '';
 }
 
@@ -3355,7 +3358,7 @@ function renderItemDetail(item){
   itemDesc.innerHTML = renderDescriptionHtml(item.description);
   itemDesc.style.display = item.description ? '' : 'none';
   const itemDescTitle = document.getElementById('itemDescriptionTitle');
-  itemDescTitle.textContent = item.descriptionTitle;
+  itemDescTitle.innerHTML = renderDescriptionHtml(item.descriptionTitle);
   // Раньше заголовок описания показывался только вместе с самим описанием
   // (description) — а у подарочных карт (gift) description_title часто
   // заполнен отдельно, без основного текста description, и заголовок
