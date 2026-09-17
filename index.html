@@ -800,7 +800,7 @@
 
     <!-- ===================== STARS / ROBUX ===================== -->
     <section class="view" data-view="rate-product">
-      <div class="rate-badge">
+      <div class="rate-badge" id="rateBadgeBox">
         <span class="rate-badge-text">
           <span class="rate-badge-label">ЧЕМ БОЛЬШЕ - ТЕМ ВЫГОДНЕЕ</span>
           <span class="rate-badge-val" id="rateRateVal">—</span>
@@ -1952,6 +1952,11 @@ function buildProductConfigs(rows){
         needsField2: parseExtraFields2(row.field_label_2, row.field_placeholder_2, row.username_format_2).length > 0,
         usernameFormat: normalizeUsernameFormat(row.username_format),
         relatedLinks: parseRelatedLinks(row.related_links),
+        // Бейдж "ЧЕМ БОЛЬШЕ - ТЕМ ВЫГОДНЕЕ" над сеткой сумм. Показывается
+        // по умолчанию (как и раньше), но можно отключить для конкретного
+        // товара, поставив в колонке show_rate_badge значение false —
+        // тогда бейдж не рисуется вообще.
+        showRateBadge: row.show_rate_badge !== false,
         // Как эта карточка выглядит САМА, когда показывается первой (слева,
         // подсвечена синим) в своей же панели переходов — см. колонку
         // related_self в таблице products (jsonb {"icon":"...","label":"..."}).
@@ -2888,6 +2893,9 @@ function renderRateProduct(cat){
   setupConsent('rate', cfg.title, !!cfg.description, updateRateSummary, cfg.consentText);
   document.getElementById('rateUsername').value = '';
   document.getElementById('rateQtyLabel').textContent = cfg.qtyLabel;
+  // Бейдж "ЧЕМ БОЛЬШЕ - ТЕМ ВЫГОДНЕЕ" скрываем целиком, если у товара
+  // явно выключен show_rate_badge (см. buildProductConfigs).
+  document.getElementById('rateBadgeBox').style.display = cfg.showRateBadge ? '' : 'none';
   document.getElementById('rateRateVal').textContent = cfg.tiers && cfg.tiers.length
     // Есть ступенчатые тарифы — показываем все пороги вместо одной цены,
     // например: "2-9 шт: 32.50 $ · от 10 шт: 29.00 $".
