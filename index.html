@@ -1908,16 +1908,31 @@ function buildProductConfigs(rows){
     if(row.active === false) return;
 
     if(row.type === 'rate'){
+      // Если в колонке variants лежит МАССИВ, но ни у одного элемента нет
+      // min_qty — это не тарифная сетка (tiers), а базовая ставка,
+      // заданная через variants вместо/вместе с колонками rate/rate_usd
+      // самой строки (например {"rate":1.06,"rate_usd":0.0118}). Раньше
+      // такой элемент молча отбрасывался фильтром tiers ниже, и реальная
+      // рублёвая ставка из него никогда не использовалась — rateRub
+      // брался из колонки rate строки, из-за чего "Примерная сумма в ₽"
+      // могла задваивать долларовую сумму, если в rate строки случайно
+      // оказывалось то же значение, что и в rate_usd. Теперь такой
+      // единственный "безномерной" элемент variants приоритетнее колонок
+      // строки для базовой ставки (и в $, и в ₽).
+      const variantsArr = Array.isArray(row.variants) ? row.variants : null;
+      const tierEntries = variantsArr ? variantsArr.filter(t => t && t.min_qty != null && t.rate != null) : [];
+      const baseOverride = (variantsArr && variantsArr.length && tierEntries.length === 0) ? variantsArr[0] : null;
       RATE_CONFIG[row.id] = {
         title: row.title,
         // Приоритет: rate_usd -> price_usd -> rate (см. variantPrice) — так
         // цена за 1 единицу может быть задана в долларах отдельной колонкой
-        // rate_usd, а rate остаётся рублёвым резервным вариантом.
-        rate: variantPrice(row, 'rate'),
-        // Настоящая рублёвая ставка — колонка rate как есть, БЕЗ приоритета
-        // rate_usd/price_usd (те нужны только для отображаемой цены в $ выше).
-        // Используется для поля "Примерная сумма в ₽" (см. updateRateSummary).
-        rateRub: Number(row.rate) || 0,
+        // rate_usd, а rate остаётся рублёвым резервным вариантом. Если задан
+        // baseOverride (см. выше) — берём именно из него.
+        rate: baseOverride ? variantPrice(baseOverride, 'rate') : variantPrice(row, 'rate'),
+        // Настоящая рублёвая ставка. Используется для поля "Примерная сумма
+        // в ₽" (см. updateRateSummary). Тоже приоритет baseOverride, иначе —
+        // колонка rate строки как есть, БЕЗ приоритета rate_usd/price_usd.
+        rateRub: baseOverride ? (Number(baseOverride.rate) || 0) : (Number(row.rate) || 0),
         unit: row.unit || '',
         glyph: row.glyph || '',
         // Категория товара из Supabase ('games' | 'services') — источник
@@ -1988,15 +2003,14 @@ function buildProductConfigs(rows){
         // -> rate. Если массив не задан (variants пуст/объект-акция) —
         // всегда используется обычный rate (тоже с приоритетом rate_usd).
         // Сортируем по возрастанию min_qty, чтобы искать снизу вверх.
-        tiers: Array.isArray(row.variants)
-          ? row.variants
-              .filter(t => t && t.min_qty != null && t.rate != null)
-              // Приоритет: rate_usd -> price_usd -> rate (см. variantPrice) —
-              // раньше здесь всегда брался только t.rate (рубли), из-за чего
-              // rate_usd у ступенчатых тарифов игнорировался и цена не
-              // переключалась на доллары.
-              // rubRate — настоящая рублёвая ставка тарифа (колонка rate как
-              // есть, без приоритета rate_usd/price_usd) для "Примерной суммы в ₽".
+        tiers: tierEntries.length
+          // Приоритет: rate_usd -> price_usd -> rate (см. variantPrice) —
+          // раньше здесь всегда брался только t.rate (рубли), из-за чего
+          // rate_usd у ступенчатых тарифов игнорировался и цена не
+          // переключалась на доллары.
+          // rubRate — настоящая рублёвая ставка тарифа (колонка rate как
+          // есть, без приоритета rate_usd/price_usd) для "Примерной суммы в ₽".
+          ? tierEntries
               .map(t => ({ minQty: Number(t.min_qty), rate: variantPrice(t, 'rate'), rubRate: Number(t.rate) || 0 }))
               .sort((a, b) => a.minQty - b.minQty)
           : null
