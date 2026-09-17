@@ -3436,6 +3436,11 @@ function selectItemVariant(i, el){
   document.querySelectorAll('#itemVariants .chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   state.itemVariantSelected = i;
+  // Выбор номинала чипом — самостоятельное действие с товаром (актуально
+  // прежде всего для gift-карт: у них часто нет поля получателя, а значит
+  // initConsentReveal через itemUsername вообще не сработает), поэтому
+  // блок согласия должен раскрываться и здесь, а не только при вводе текста.
+  revealConsent('item');
   updateItemSummary();
 }
 
@@ -3443,6 +3448,7 @@ function changeItemQty(d){
   const item = state.currentListItem;
   const max = (item?.maxQty != null && item.maxQty > 1) ? item.maxQty : 1;
   state.itemQty = Math.max(1, Math.min(max, state.itemQty + d));
+  revealConsent('item');
   updateItemSummary();
 }
 
