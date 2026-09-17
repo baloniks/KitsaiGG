@@ -2979,6 +2979,11 @@ function selectRate(opt, el){
   el.classList.add('selected');
   document.getElementById('rateCustomWrap').style.display = 'none';
   state.rateSelected = opt;
+  // Выбор готовой суммы кликом по чипу — тоже действие пользователя с
+  // товаром, поэтому блок согласия должен показываться и в этом случае,
+  // а не только при вводе текста в username/своё количество (см.
+  // initConsentReveal выше — там этот сценарий не покрывался).
+  revealConsent('rate');
   updateRateSummary();
 }
 
@@ -2988,6 +2993,7 @@ function selectCustomChip(cfg){
   document.getElementById('rateCustomWrap').style.display = '';
   const input = document.getElementById('rateCustomInput');
   input.focus();
+  revealConsent('rate');
   applyCustomRateInput(cfg);
 }
 
