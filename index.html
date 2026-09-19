@@ -1557,7 +1557,8 @@ const PAYMENT_METHODS = {
   cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
   lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
   // Эквайринг Antilopay (карта / СБП). feeRate ОБЯЗАН совпадать с antilopay_fee_rate в antifraud_settings.
-  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0.05 },
+  // Комиссия временно убрана (0%) — было 0.05 (5%), верните это значение, когда комиссию нужно будет вернуть.
+  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0 },
 };
 
 /* ---------------- REVIEW BANNER (предложение оставить отзыв в TG-группе) ---------------- */
