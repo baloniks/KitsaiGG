@@ -1363,6 +1363,7 @@
 
     <!-- ===================== TOP-UP ===================== -->
     <section class="view" data-view="topup">
+      <!-- Плашка с инструкциями по ручному/автопополнению временно убрана по просьбе — см. содержимое ниже, легко вернуть обратно.
       <div class="warning-box" style="margin-top:2px;">
         <div>❗ Для пополнения баланса <strong>без комиссий</strong> напишите нам в личные сообщения: <a href="#" id="topupManagerLink" style="color:inherit; text-decoration:underline;">@Manager_KitsaiGG</a> или создайте тикет с темой «Пополнение баланса».
 
@@ -1383,6 +1384,7 @@
 ⚠️ Внимание! При оплате другими сетями дополнительная комиссия будет удержана из суммы платежа. (Особенно если CryptoBot внутри этого сервиса)
 Выбирайте правильную сеть, чтобы избежать лишних расходов 🙏</div>
       </div>
+      -->
 
       <div class="section-label" style="margin-top:0;">Способ оплаты</div>
       <div class="method-grid" id="topupMethods">
@@ -4705,8 +4707,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('linkReviews').addEventListener('click', () => openExternalLink(REVIEW_GROUP_URL));
   document.getElementById('linkOurChannel').addEventListener('click', () => openExternalLink('https://t.me/KitsaiGG'));
 
-  // Ссылка на менеджера в плашке про комиссию CryptoBot (экран пополнения)
-  document.getElementById('topupManagerLink').addEventListener('click', (e) => {
+  // Ссылка на менеджера в плашке про комиссию CryptoBot (экран пополнения).
+  // Плашка временно убрана из HTML — элемента может не быть в DOM, проверяем перед подпиской.
+  document.getElementById('topupManagerLink')?.addEventListener('click', (e) => {
     e.preventDefault();
     openExternalLink('https://t.me/Manager_KitsaiGG');
   });
