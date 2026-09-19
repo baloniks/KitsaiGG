@@ -213,6 +213,10 @@
   }
   .method-card.selected .method-name{color:var(--accent-2);}
   .method-card.selected .method-fee{color:var(--accent-2);}
+  .method-card.locked{
+    cursor:not-allowed; opacity:.5; filter:grayscale(.4);
+  }
+  .method-card.locked .method-fee{color:var(--text-faint);}
 
   /* ---------- Related products (кросс-ссылки на карточке товара) ---------- */
   .related-links{
@@ -1203,7 +1207,11 @@
 
         <h3 style="color:var(--text); font-size:14px; font-weight:600; margin:20px 0 8px;">14. Контактная информация</h3>
         <p style="margin-bottom:8px;"><strong style="color:var(--text-muted);">14.1.</strong> По вопросам, связанным с заказами, оплатой, возвратами и использованием Сервиса, Пользователь может обратиться в службу поддержки KitsaiGG через доступные в Сервисе способы связи.</p>
-        <p style="margin-bottom:14px;"><strong style="color:var(--text-muted);">14.2.</strong> При обращении по поводу заказа Пользователю рекомендуется указать номер заказа и подробно описать возникшую проблему.</p>
+        <p style="margin-bottom:8px;"><strong style="color:var(--text-muted);">14.2.</strong> При обращении по поводу заказа Пользователю рекомендуется указать номер заказа и подробно описать возникшую проблему.</p>
+        <p style="margin-bottom:14px;"><strong style="color:var(--text-muted);">14.3.</strong> Реквизиты компании: ОсОО «Пэй Флоу». Адрес: Кыргызская Республика, г. Бишкек, Первомайский район, пер. Клубный, д. 18, кв. 5. ОГРН: 326149-3301-ООО. ИНН: 9909762323.</p>
+
+        <h3 style="color:var(--text); font-size:14px; font-weight:600; margin:20px 0 8px;">15. Политика возвратов</h3>
+        <p style="margin-bottom:14px;">Условия и порядок возврата денежных средств за приобретённые цифровые товары и услуги определяются отдельной Политикой возвратов KitsaiGG, являющейся неотъемлемой частью настоящего Соглашения и доступной в разделе «Политика возвратов» в Сервисе.</p>
 
         <p style="margin-bottom:0;">Используя Сервис, оформляя заказ и/или производя оплату, Пользователь подтверждает, что ознакомился с настоящим Пользовательским соглашением и принимает его условия в полном объёме.</p>
       </div>
@@ -1460,6 +1468,11 @@ const state = {
   telegramId: null, // реальный telegram_id из initDataUnsafe.user, если открыто в Telegram
   balance: 0,
   kcoinBalance: 0,
+  // Когда аккаунт впервые зашёл в бота (мс, из get-profile → account_created_at).
+  // null, пока не подгружено (вне Telegram, до первого loadBalance и т.п.) —
+  // в этом случае клиентская блокировка Antilopay не применяется, но
+  // серверная проверка в create-antilopay-invoice работает в любом случае.
+  accountCreatedAt: null,
   pendingKcoinToUse: null, // сколько KCoin списываем в текущем оформлении заказа
   orders: [],
   ordersLoaded: false, // грузили ли уже историю заказов из Supabase хоть раз
@@ -1524,6 +1537,14 @@ const GROUP_TITLES = {
 };
 
 const TOPUP_AMOUNTS = [1,5,10,25,50,100];
+
+// Мин. возраст аккаунта (часов с первого захода в бота) для оплаты через
+// Antilopay (карта/СБП). ТОЛЬКО для UI (чтобы заранее скрыть недоступный
+// способ и не заставлять ждать ответа сервера) — реальная проверка и
+// единственная точка правды всегда на сервере, в create-antilopay-invoice
+// (см. antilopay_min_account_age_hours в antifraud_settings). Если поменяете
+// значение в базе, поменяйте и здесь, иначе UI и сервер разойдутся.
+const ANTILOPAY_MIN_ACCOUNT_AGE_HOURS = 72;
 
 // Способы автоматического пополнения. feeRate — наша наценка сверх суммы,
 // которая зачислится на баланс (см. комментарий в confirmTopup). functionName —
@@ -4223,8 +4244,53 @@ function selectTopupCustom(){
   updateTopupBtn();
 }
 
+// true, если оплата картой/СБП (Antilopay) сейчас недоступна этому аккаунту
+// из-за недавней регистрации в боте. Пока state.accountCreatedAt не
+// подгружен (null) — считаем НЕ заблокированным на клиенте: финальное слово
+// в любом случае за сервером (create-antilopay-invoice отклонит запрос
+// с error:'account_too_new', если проверка на клиенте почему-то была
+// обойдена или устарела).
+function isAntilopayLocked(){
+  if(state.accountCreatedAt == null) return false;
+  return (Date.now() - state.accountCreatedAt) < ANTILOPAY_MIN_ACCOUNT_AGE_HOURS * 3600 * 1000;
+}
+
+// Сколько часов осталось до разблокировки Antilopay (минимум 1, чтобы не
+// показывать "через 0 ч").
+function antilopayHoursLeft(){
+  if(state.accountCreatedAt == null) return ANTILOPAY_MIN_ACCOUNT_AGE_HOURS;
+  const leftMs = ANTILOPAY_MIN_ACCOUNT_AGE_HOURS * 3600 * 1000 - (Date.now() - state.accountCreatedAt);
+  return Math.max(1, Math.ceil(leftMs / 3600000));
+}
+
+// Перекрашивает карточку Antilopay в заблокированный вид и, если она
+// оказалась выбрана (например до подгрузки accountCreatedAt), переключает
+// на CryptoBot по умолчанию. Вызывается после loadBalance() и при открытии
+// экрана пополнения.
+function updateAntilopayLock(){
+  const card = document.querySelector('#topupMethods .method-card[data-method="antilopay"]');
+  if(!card) return;
+  const locked = isAntilopayLocked();
+  card.classList.toggle('locked', locked);
+  const feeEl = card.querySelector('.method-fee');
+  if(feeEl){
+    feeEl.textContent = locked
+      ? `Доступно через ${antilopayHoursLeft()} ч после регистрации`
+      : 'Оплатить нужно в течение 3 минут';
+  }
+  if(locked && state.topupMethod === 'antilopay'){
+    state.topupMethod = 'cryptobot';
+    syncTopupMethods();
+    updateTopupBtn();
+  }
+}
+
 function selectTopupMethod(method){
   if(!PAYMENT_METHODS[method]) return;
+  if(method === 'antilopay' && isAntilopayLocked()){
+    showToast(`Оплата картой/СБП станет доступна через ${antilopayHoursLeft()} ч после регистрации в боте`);
+    return;
+  }
   state.topupMethod = method;
   syncTopupMethods();
   updateTopupBtn();
@@ -4265,6 +4331,15 @@ async function confirmTopup(){
   const btn = document.getElementById('topupBtn');
   if(btn.classList.contains('disabled')) return;
 
+  // Подстраховка на случай, если состояние успело устареть (например,
+  // accountCreatedAt подгрузился уже после того, как способ был выбран).
+  // Окончательное решение всё равно за сервером — см. error:'account_too_new' ниже.
+  if(state.topupMethod === 'antilopay' && isAntilopayLocked()){
+    updateAntilopayLock();
+    showToast(`Оплата картой/СБП станет доступна через ${antilopayHoursLeft()} ч после регистрации в боте`);
+    return;
+  }
+
   if(!supabaseClient){
     showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
     return;
@@ -4296,6 +4371,9 @@ async function confirmTopup(){
         cryptobot_error: 'CryptoBot временно недоступен. Попробуйте позже',
         lavepay_error: 'Lave Pay временно недоступен. Попробуйте позже',
         antilopay_error: 'Оплата картой временно недоступна. Попробуйте позже',
+        account_too_new: data?.retry_after_hours
+          ? `Оплата картой/СБП станет доступна примерно через ${Math.ceil(Number(data.retry_after_hours))} ч после регистрации в боте`
+          : 'Оплата картой/СБП пока недоступна для нового аккаунта',
         banned: 'Аккаунт заблокирован. Обратитесь в поддержку',
         cooldown: 'Слишком часто. Подождите несколько секунд',
         too_many_pending: 'У вас уже есть неоплаченные счета. Оплатите их или подождите',
@@ -4304,6 +4382,7 @@ async function confirmTopup(){
         db_error: 'Не удалось создать счёт. Попробуйте ещё раз'
       };
       showToast(messages[code] || 'Не удалось создать счёт. Попробуйте ещё раз');
+      if(code === 'account_too_new') updateAntilopayLock(); // подчистить UI, если состояние успело разойтись с сервером
       return;
     }
 
@@ -4360,7 +4439,12 @@ async function loadBalance(){
 
     state.balance = parsedBalance;
     state.kcoinBalance = Number(data?.kcoin_balance) || 0;
+    if(data?.account_created_at){
+      const ts = new Date(data.account_created_at).getTime();
+      if(!Number.isNaN(ts)) state.accountCreatedAt = ts;
+    }
     renderBalance();
+    updateAntilopayLock();
   } catch(e){
     console.error('get-profile error:', e);
   }
@@ -4480,6 +4564,7 @@ function openTopup(){
   syncTopupChips();
   syncTopupMethods();
   updateTopupBtn();
+  updateAntilopayLock(); // перерисовать карточку Antilopay по уже известному accountCreatedAt
   pushView('topup', {sub:true, title:'Пополнение баланса'});
 }
 
