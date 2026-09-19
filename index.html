@@ -1366,7 +1366,9 @@
 • Tonkeeper - TON или USDT (TRC20, TON). Пополнение на любую сумму.
 • Перевод по СБП. Пополнение на любую сумму. Выполняется в течение 12 часов.
 
-💳 Автоматическое пополнение — CryptoBot (+4%) или Lave Pay (+2%). Пополнение на любую сумму и валюту
+💳 Автоматическое пополнение — CryptoBot (+4%), Lave Pay (+2%) или банковская карта / СБП. Пополнение на любую сумму и валюту
+
+🏦 Карта / СБП: ссылка на оплату действует 3 минуты — оплачивайте сами и только с вашей карты. При оплате новой картой мы можем попросить скриншот карты (видны последние 4 цифры) на фоне магазина.
 
 💎 Lave Pay принимает оплату только:
 • USDT TRC20 • USDT TON • С кошелька Laveshka
@@ -1383,6 +1385,10 @@
         <div class="method-card" data-method="lavepay">
           <div class="method-name">Lave Pay</div>
           <div class="method-fee">Комиссия 2%</div>
+        </div>
+        <div class="method-card" data-method="antilopay" style="grid-column:1 / -1;">
+          <div class="method-name">Банковская карта / СБП</div>
+          <div class="method-fee">Оплатить нужно в течение 3 минут</div>
         </div>
       </div>
 
@@ -1525,6 +1531,8 @@ const TOPUP_AMOUNTS = [1,5,10,25,50,100];
 const PAYMENT_METHODS = {
   cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
   lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
+  // Эквайринг Antilopay (карта / СБП). feeRate ОБЯЗАН совпадать с antilopay_fee_rate в antifraud_settings.
+  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0.05 },
 };
 
 /* ---------------- REVIEW BANNER (предложение оставить отзыв в TG-группе) ---------------- */
@@ -3915,7 +3923,10 @@ async function confirmPurchase(){
         unauthorized: 'Не удалось подтвердить пользователя Telegram',
         invalid_params: 'Некорректные данные заказа',
         profile_not_found: 'Профиль не найден',
-        invalid_promo: 'Промокод недействителен или уже использован'
+        invalid_promo: 'Промокод недействителен или уже использован',
+        banned: 'Аккаунт заблокирован. Обратитесь в поддержку',
+        recipient_banned: 'Заказ для этого получателя невозможен',
+        not_subscribed: 'Подпишитесь на наш канал, чтобы оформить заказ'
       };
       showToast(messages[code] || 'Не удалось оформить заказ. Попробуйте ещё раз');
       return;
@@ -3956,7 +3967,9 @@ async function confirmPurchase(){
     showView('success', {sub:true, title:'Готово'});
     renderReviewBanner();
 
-    if(data.cashback > 0){
+    if(data.moderation === 'pending'){
+      showToast('Заказ отправлен на проверку модератору — выдача может занять больше времени');
+    } else if(data.cashback > 0){
       showToast(`Начислен кэшбек: +${data.cashback} KC`);
     }
 
@@ -4282,6 +4295,12 @@ async function confirmTopup(){
         unauthorized: 'Не удалось подтвердить пользователя Telegram',
         cryptobot_error: 'CryptoBot временно недоступен. Попробуйте позже',
         lavepay_error: 'Lave Pay временно недоступен. Попробуйте позже',
+        antilopay_error: 'Оплата картой временно недоступна. Попробуйте позже',
+        banned: 'Аккаунт заблокирован. Обратитесь в поддержку',
+        cooldown: 'Слишком часто. Подождите несколько секунд',
+        too_many_pending: 'У вас уже есть неоплаченные счета. Оплатите их или подождите',
+        daily_limit: 'Достигнут суточный лимит пополнений',
+        too_many_attempts: 'Слишком много попыток пополнения. Попробуйте позже или обратитесь в поддержку',
         db_error: 'Не удалось создать счёт. Попробуйте ещё раз'
       };
       showToast(messages[code] || 'Не удалось создать счёт. Попробуйте ещё раз');
@@ -4293,6 +4312,9 @@ async function confirmTopup(){
       return;
     }
 
+    if(data.expires_in){
+      showToast(`Ссылка на оплату действует ${Math.round(Number(data.expires_in)/60)} мин.`);
+    }
     openExternalLink(data.pay_url);
   } catch(e){
     console.error(`${method.functionName} error:`, e);
