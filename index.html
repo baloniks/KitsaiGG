@@ -1644,7 +1644,7 @@ async function dismissReviewBanner(){
   if(order) order.reviewDismissed = true;
   addLocalDismissedReview(orderId);
 
-  const initData = getTelegramInitData();
+  const initData = await waitForTelegramInitData();
   if(!supabaseClient || !initData) return;
 
   try {
@@ -2571,7 +2571,7 @@ function setReferralStatsCache(count, earned) {
 
 async function loadReferralStats({ force = false } = {}){
   if(!supabaseClient) return;
-  const initData = getTelegramInitData();
+  const initData = await waitForTelegramInitData();
   if(!initData) return;
 
   // Если кэш свежий и принудительное обновление не запрошено — берём из кэша
@@ -3871,7 +3871,7 @@ async function applyCheckoutPromoCode(p){
   const code = input.value.trim();
   if(!code){ showPromoError('Введите промокод'); return; }
 
-  const initData = getTelegramInitData();
+  const initData = await waitForTelegramInitData();
   if(!initData){
     showPromoError('Откройте приложение через Telegram-бота');
     return;
@@ -3916,7 +3916,7 @@ async function confirmPurchase(){
   btn.textContent = 'Обрабатываем...';
   btn.classList.add('disabled');
 
-  const initData = getTelegramInitData();
+  const initData = await waitForTelegramInitData();
   if(!initData){
     showToast('Откройте приложение через Telegram-бота');
     btn.textContent = prevText;
@@ -4049,7 +4049,7 @@ function orderStatusMeta(status){
 // фильтрации сервер достаёт сам из проверенного init_data, а не из
 // непроверенного state.telegramId (см. обсуждение безопасности в чате).
 async function loadOrders(){
-  const initData = getTelegramInitData();
+  const initData = await waitForTelegramInitData();
   if(!supabaseClient || !initData){
     renderOrders(state.currentOrdersFilter || 'all');
     renderReviewBanner();
@@ -4445,7 +4445,11 @@ async function waitForTelegramInitData(timeoutMs = 1500, stepMs = 100){
 /* Обновляем баланс с сервера */
 async function loadBalance(){
   if(!supabaseClient) return;
-  const initData = getTelegramInitData();
+  // Ждём initData, а не проверяем мгновенно: на macOS/Linux Desktop-клиенте
+  // initData может подтянуться позже, чем срабатывает loadBalance() при
+  // старте страницы — из-за мгновенной проверки баланс и профиль ошибочно
+  // оставались в демо-режиме, хотя приложение было открыто через бота.
+  const initData = await waitForTelegramInitData();
   if(!initData) return; // открыто вне Telegram — баланс останется 0 (демо-режим)
 
   try {
@@ -4533,7 +4537,7 @@ async function applyPromoCode(){
 
   if(!code){ showToast('Введите промокод'); return; }
 
-  const initData = getTelegramInitData();
+  const initData = await waitForTelegramInitData();
   if(!initData){
     showToast('Откройте приложение через Telegram-бота, чтобы применить промокод');
     return;
@@ -4617,7 +4621,7 @@ function showToast(msg){
 }
 
 /* ---------------- EVENT LISTENERS ATTACHMENT ---------------- */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Копирование ID заказа по тапу на чеке (делегируем, т.к. чек вставляется динамически)
   document.addEventListener('click', (e) => {
     const el = e.target.closest('.copy-id');
@@ -4628,6 +4632,16 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
+
+      // На Windows (WebView2) initDataUnsafe обычно уже готов к этому моменту,
+      // но на macOS (WKWebView) и особенно на Linux (WebKitGTK) заполнение
+      // initData/initDataUnsafe может занять ещё несколько десятков-сотен мс
+      // после создания Telegram.WebApp (см. waitForTelegramInitData ниже по
+      // коду). Раньше здесь было одноразовое мгновенное чтение — на таких
+      // платформах оно часто попадало "в пустоту", и профиль не показывался,
+      // хотя приложение было открыто корректно через бота. Поэтому сначала
+      // недолго ждём появления initData, и только потом читаем пользователя.
+      await waitForTelegramInitData();
 
       // Подставляем реальные данные пользователя из Telegram
       const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
@@ -4776,7 +4790,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
       return;
     }
-    const initData = getTelegramInitData();
+    const initData = await waitForTelegramInitData();
     if (!initData) {
       showToast('Откройте приложение через Telegram-бота, чтобы отправить тикет');
       return;
