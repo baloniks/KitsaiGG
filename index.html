@@ -4349,9 +4349,16 @@ async function confirmTopup(){
     showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
     return;
   }
-  const initData = getTelegramInitData();
+  // Даём Telegram Desktop немного времени, если initData ещё не подтянулся
+  // (см. waitForTelegramInitData) — раньше здесь была мгновенная проверка,
+  // из-за которой на Desktop-клиенте могла ложно всплывать ошибка
+  // "откройте через бота", хотя приложение было открыто корректно.
+  btn.textContent = 'Проверяем...';
+  btn.classList.add('disabled');
+  const initData = await waitForTelegramInitData();
   if(!initData){
     showToast('Откройте приложение через Telegram-бота, чтобы пополнить баланс');
+    updateTopupBtn();
     return;
   }
 
@@ -4410,6 +4417,29 @@ async function confirmTopup(){
 
 function getTelegramInitData(){
   return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) || '';
+}
+
+// На Telegram Desktop объект Telegram.WebApp создаётся сразу, а вот
+// initData иногда подтягивается с небольшой задержкой (десятки—сотни мс)
+// после этого. Из-за этого мгновенная разовая проверка getTelegramInitData()
+// в момент клика по кнопке могла ошибочно решить, что приложение открыто
+// вне бота, хотя initData появлялся буквально через мгновение.
+// Эта функция недолго опрашивает initData перед тем как сдаться.
+async function waitForTelegramInitData(timeoutMs = 1500, stepMs = 100){
+  let initData = getTelegramInitData();
+  if(initData) return initData;
+
+  // Если самого объекта Telegram.WebApp нет вообще — приложение точно
+  // открыто вне Telegram, ждать нечего.
+  if(!(window.Telegram && window.Telegram.WebApp)) return '';
+
+  const start = Date.now();
+  while(Date.now() - start < timeoutMs){
+    await new Promise(r => setTimeout(r, stepMs));
+    initData = getTelegramInitData();
+    if(initData) return initData;
+  }
+  return '';
 }
 
 /* Обновляем баланс с сервера */
