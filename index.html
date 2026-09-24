@@ -3944,7 +3944,12 @@ async function confirmPurchase(){
     });
 
     if(error || data?.error){
-      const code = data?.error;
+      let code = data?.error;
+      // supabase-js при ответе не-2xx отдаёт data = null, а тело лежит в error.context
+      if(!code && error && error.context && typeof error.context.json === 'function'){
+        try { code = (await error.context.json())?.error; } catch(_){}
+      }
+      console.error('create-order failed:', code, error);
       const messages = {
         insufficient_funds: 'Недостаточно средств',
         unauthorized: 'Не удалось подтвердить пользователя Telegram',
