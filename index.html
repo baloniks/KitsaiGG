@@ -1547,6 +1547,9 @@ const TOPUP_AMOUNTS = [1,5,10,25,50,100];
 // Курс $ → ₽ для отображения суммы к оплате через Antilopay (СБП). Только для UI.
 const ANTILOPAY_USD_RUB_RATE = 89;
 
+// Комиссия эквайринга Antilopay (3%). Удерживается самим банком, мы её не добавляем — только показываем пользователю итоговую сумму в ₽.
+const ANTILOPAY_ACQUIRING_FEE = 0.03;
+
 // Минимальная сумма пополнения через Antilopay (СБП), в $. Только для UI — сервер должен проверять то же самое.
 const ANTILOPAY_MIN_AMOUNT_USD = 0.12;
 
@@ -1564,9 +1567,9 @@ const ANTILOPAY_MIN_ACCOUNT_AGE_HOURS = 72;
 const PAYMENT_METHODS = {
   cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
   lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
-  // Эквайринг Antilopay (карта / СБП). feeRate ОБЯЗАН совпадать с antilopay_fee_rate в antifraud_settings.
-  // Комиссия 3%. ВАЖНО: на сервере antilopay_fee_rate тоже должен быть 0.03.
-  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0.03 },
+  // Эквайринг Antilopay (карта / СБП). Комиссию 3% добавляет сам банк-эквайринг на своей странице оплаты,
+  // поэтому наша наценка = 0 (см. ANTILOPAY_ACQUIRING_FEE — она нужна только для показа суммы в рублях).
+  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0 },
 };
 
 /* ---------------- REVIEW BANNER (предложение оставить отзыв в TG-группе) ---------------- */
@@ -4336,7 +4339,7 @@ function updateTopupBtn(){
     if(state.topupMethod === 'antilopay'){
       // СБП: показываем сумму в рублях (с комиссией) по курсу ANTILOPAY_USD_RUB_RATE
       // Эквайринг удерживает комиссию из общей суммы платежа, поэтому делим на (1 - комиссия), а не умножаем на (1 + комиссия)
-      const totalRub = round2(state.topupAmount * ANTILOPAY_USD_RUB_RATE / (1 - feeRate));
+      const totalRub = round2(state.topupAmount * ANTILOPAY_USD_RUB_RATE / (1 - ANTILOPAY_ACQUIRING_FEE));
       feeNote.textContent = `К оплате ${totalRub.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽`;
     } else {
       feeNote.textContent = `К оплате ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}$`;
