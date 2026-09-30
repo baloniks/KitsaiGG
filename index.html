@@ -1400,8 +1400,9 @@
           <div class="method-fee">Комиссия 2%</div>
         </div>
         <div class="method-card" data-method="antilopay" style="grid-column:1 / -1;">
-          <div class="method-name">Банковская карта / СБП</div>
+          <div class="method-name">Antilopay ( СБП )</div>
           <div class="method-fee">Оплатить нужно в течение 3 минут</div>
+          <div class="method-fee">Комиссия 3%, Курс $ к рублю 89</div>
         </div>
       </div>
 
@@ -1543,6 +1544,12 @@ const GROUP_TITLES = {
 
 const TOPUP_AMOUNTS = [1,5,10,25,50,100];
 
+// Курс $ → ₽ для отображения суммы к оплате через Antilopay (СБП). Только для UI.
+const ANTILOPAY_USD_RUB_RATE = 89;
+
+// Минимальная сумма пополнения через Antilopay (СБП), в $. Только для UI — сервер должен проверять то же самое.
+const ANTILOPAY_MIN_AMOUNT_USD = 0.12;
+
 // Мин. возраст аккаунта (часов с первого захода в бота) для оплаты через
 // Antilopay (карта/СБП). ТОЛЬКО для UI (чтобы заранее скрыть недоступный
 // способ и не заставлять ждать ответа сервера) — реальная проверка и
@@ -1558,8 +1565,8 @@ const PAYMENT_METHODS = {
   cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
   lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
   // Эквайринг Antilopay (карта / СБП). feeRate ОБЯЗАН совпадать с antilopay_fee_rate в antifraud_settings.
-  // Комиссия временно убрана (0%) — было 0.05 (5%), верните это значение, когда комиссию нужно будет вернуть.
-  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0 },
+  // Комиссия 3%. ВАЖНО: на сервере antilopay_fee_rate тоже должен быть 0.03.
+  antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0.03 },
 };
 
 /* ---------------- REVIEW BANNER (предложение оставить отзыв в TG-группе) ---------------- */
@@ -4316,13 +4323,24 @@ function syncTopupMethods(){
 function updateTopupBtn(){
   const btn = document.getElementById('topupBtn');
   const feeNote = document.getElementById('topupFeeNote');
-  if(state.topupAmount && state.topupAmount > 0){
+  if(state.topupMethod === 'antilopay' && state.topupAmount && state.topupAmount > 0 && state.topupAmount < ANTILOPAY_MIN_AMOUNT_USD){
+    btn.textContent = `Минимум ${ANTILOPAY_MIN_AMOUNT_USD.toString().replace('.', ',')}$ для СБП`;
+    btn.classList.add('disabled');
+    feeNote.style.display = 'none';
+  } else if(state.topupAmount && state.topupAmount > 0){
     btn.textContent = 'Пополнить баланс';
     btn.classList.remove('disabled');
 
     const feeRate = PAYMENT_METHODS[state.topupMethod].feeRate;
     const totalDue = round2(state.topupAmount * (1 + feeRate));
-    feeNote.textContent = `К оплате ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}$`;
+    if(state.topupMethod === 'antilopay'){
+      // СБП: показываем сумму в рублях (с комиссией) по курсу ANTILOPAY_USD_RUB_RATE
+      // Эквайринг удерживает комиссию из общей суммы платежа, поэтому делим на (1 - комиссия), а не умножаем на (1 + комиссия)
+      const totalRub = round2(state.topupAmount * ANTILOPAY_USD_RUB_RATE / (1 - feeRate));
+      feeNote.textContent = `К оплате ${totalRub.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽`;
+    } else {
+      feeNote.textContent = `К оплате ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}$`;
+    }
     feeNote.style.display = 'block';
   } else {
     btn.textContent = 'Выберите сумму';
@@ -4341,6 +4359,11 @@ async function confirmTopup(){
 
   const btn = document.getElementById('topupBtn');
   if(btn.classList.contains('disabled')) return;
+
+  if(state.topupMethod === 'antilopay' && state.topupAmount < ANTILOPAY_MIN_AMOUNT_USD){
+    showToast(`Минимальная сумма для СБП — ${ANTILOPAY_MIN_AMOUNT_USD.toString().replace('.', ',')}$`);
+    return;
+  }
 
   // Подстраховка на случай, если состояние успело устареть (например,
   // accountCreatedAt подгрузился уже после того, как способ был выбран).
