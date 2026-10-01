@@ -188,6 +188,8 @@
   .chip .amt{font-family:var(--font-mono); font-weight:600; font-size:14px; line-height:1.25;}
   .chip .amt.long{font-size:11.5px; line-height:1.3;}
   .chip .sub{font-size:10px; color:var(--text-faint); margin-top:2px;}
+  .chip .sub.stock{font-size:9.5px; opacity:.8;}
+  .chip .sub.stock.out{color:#e5484d; opacity:1;}
   .chip.selected{
     border-color:var(--accent); background:var(--accent-soft);
     box-shadow:0 0 0 1px var(--accent) inset;
@@ -2132,6 +2134,7 @@ function buildProductConfigs(rows){
         // отдельное рублёвое значение (см. updateItemSummary).
         priceRub: Number(row.price) || 0,
         variants: Array.isArray(row.variants) && row.variants.length ? row.variants : null,
+        stockInfo: row.stock_info || null,
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
@@ -3449,6 +3452,18 @@ function renderItemDetail(item){
   // и зачёркнутую старую цену рядом, прямо на самой кнопке-варианте.
   const variantGrid = document.getElementById('itemVariants');
   variantGrid.innerHTML = '';
+  // Остаток у поставщика (products.stock_info, заполняет функция stock-sync).
+  // Показываем только если данные свежее 3 часов; null/нет данных — ничего не пишем.
+  const stockFresh = item.stockInfo && item.stockInfo.updated_at &&
+    (Date.now() - new Date(item.stockInfo.updated_at).getTime()) < 3*60*60*1000;
+  const stockLabel = (i) => {
+    if(!stockFresh) return '';
+    const n = (item.stockInfo.variants || [])[i];
+    if(n == null) return '';
+    if(n <= 0) return 'Нет в наличии';
+    if(n >= 100) return 'В наличии: 100+';
+    return 'В наличии: ' + n;
+  };
   if(item.variants){
     variantGrid.style.display = '';
     item.variants.forEach((v, i) => {
@@ -3457,7 +3472,7 @@ function renderItemDetail(item){
       const hasSale = v.old_price != null;
       chip.innerHTML = `
         <div class="amt">${v.label}</div>
-        <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(variantPrice(v))}</span>${hasSale ? ` <span class="price-old">${rub(Number(v.old_price))}</span>` : ''}</div>`;
+        <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(variantPrice(v))}</span>${hasSale ? ` <span class="price-old">${rub(Number(v.old_price))}</span>` : ''}</div>${stockLabel(i) ? `<div class="sub stock${stockLabel(i)==='Нет в наличии' ? ' out' : ''}">${stockLabel(i)}</div>` : ''}`;
       chip.addEventListener('click', () => selectItemVariant(i, chip));
       variantGrid.appendChild(chip);
     });
