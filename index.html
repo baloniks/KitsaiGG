@@ -2078,6 +2078,7 @@ function buildProductConfigs(rows){
         // См. комментарий у RATE_CONFIG.category выше — тот же принцип.
         category: row.category || '',
         plans: Array.isArray(row.variants) ? row.variants : [],
+        stockInfo: row.stock_info || null,
         fieldLabel: row.field_label || '',
         fieldPlaceholder: row.field_placeholder || '',
         needsField: !!(row.field_label && String(row.field_label).trim()),
@@ -2213,6 +2214,17 @@ function randomizeWithPinnedOrder(items){
 // Загружает товары из таблицы products в Supabase и перестраивает каталог.
 // Вызывается один раз при старте приложения; при ошибке/отсутствии сети
 // каталог просто останется пустым и покажет empty-state с подсказкой.
+// Подпись остатка у поставщика для i-го варианта (products.stock_info, пишет stock-sync).
+// Пусто, если данных нет, они старше 3 часов или у варианта нет привязки (null).
+function stockLabelFor(info, i){
+  if(!info || !info.updated_at) return '';
+  if(Date.now() - new Date(info.updated_at).getTime() > 3*60*60*1000) return '';
+  const n = (info.variants || [])[i];
+  if(n == null) return '';
+  if(n <= 0) return 'Нет в наличии';
+  if(n >= 100) return 'В наличии: 100+';
+  return 'В наличии: ' + n;
+}
 async function loadProducts(){
   const wrap = document.getElementById('catalogList');
   if(wrap){
@@ -3128,7 +3140,7 @@ function renderPremiumProduct(id){
     const isLong = String(p.label || '').length > 16;
     chip.innerHTML = `
       <div class="amt${isLong ? ' long' : ''}">${p.label}</div>
-      <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(variantPrice(p))}</span>${hasSale ? ` <span class="price-old">${rub(Number(p.old_price))}</span>` : ''}</div>`;
+      <div class="sub"><span class="${hasSale ? 'price-current sale' : ''}">${rub(variantPrice(p))}</span>${hasSale ? ` <span class="price-old">${rub(Number(p.old_price))}</span>` : ''}</div>${stockLabelFor(cfg.stockInfo, i) ? `<div class="sub stock${stockLabelFor(cfg.stockInfo, i)==='Нет в наличии' ? ' out' : ''}">${stockLabelFor(cfg.stockInfo, i)}</div>` : ''}`;
     chip.addEventListener('click', () => selectPremium(i, chip));
     grid.appendChild(chip);
   });
@@ -3452,18 +3464,7 @@ function renderItemDetail(item){
   // и зачёркнутую старую цену рядом, прямо на самой кнопке-варианте.
   const variantGrid = document.getElementById('itemVariants');
   variantGrid.innerHTML = '';
-  // Остаток у поставщика (products.stock_info, заполняет функция stock-sync).
-  // Показываем только если данные свежее 3 часов; null/нет данных — ничего не пишем.
-  const stockFresh = item.stockInfo && item.stockInfo.updated_at &&
-    (Date.now() - new Date(item.stockInfo.updated_at).getTime()) < 3*60*60*1000;
-  const stockLabel = (i) => {
-    if(!stockFresh) return '';
-    const n = (item.stockInfo.variants || [])[i];
-    if(n == null) return '';
-    if(n <= 0) return 'Нет в наличии';
-    if(n >= 100) return 'В наличии: 100+';
-    return 'В наличии: ' + n;
-  };
+  const stockLabel = (i) => stockLabelFor(item.stockInfo, i);
   if(item.variants){
     variantGrid.style.display = '';
     item.variants.forEach((v, i) => {
