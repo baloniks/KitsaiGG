@@ -609,6 +609,15 @@
     color:var(--text); font-weight:600; font-size:12.5px; text-align:center;
   }
 
+  .ton-pay-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;}
+  .ton-pay-row{padding:12px 14px; border-bottom:1px solid var(--border); cursor:pointer;}
+  .ton-pay-row:last-child{border-bottom:0;}
+  .ton-pay-row:active{background:rgba(96,146,250,.08);}
+  .ton-pay-label{font-size:11.5px; color:var(--text-muted); margin-bottom:4px;}
+  .ton-pay-value{font-size:13px; font-weight:600; word-break:break-all; overflow-wrap:anywhere; line-height:1.4;}
+  .ton-pay-big{font-size:20px; font-family:var(--font-display); color:var(--accent-2);}
+  .ton-pay-hint{font-size:10.5px; color:var(--text-faint); margin-top:3px;}
+
   .rate-badge{
     display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 14px; padding:12px 14px;
     border-radius:var(--radius-lg); position:relative; overflow:hidden;
@@ -1482,6 +1491,43 @@
     </section>
 
     <!-- ===================== TOP-UP ===================== -->
+    <!-- ===================== TON PAY ===================== -->
+    <section class="view" data-view="ton-pay">
+      <div class="warning-box" style="margin-top:2px;">
+        <div>⚠️ Отправляйте <strong>точную сумму USDT</strong> в сети <strong>TON</strong> и обязательно <strong>с комментарием</strong>. Если сумма или комментарий будут другими, после проверки баланс пополнится на ту сумму, которая фактически пришла, а без комментария зачисление может занять больше времени.</div>
+      </div>
+
+      <div class="ton-pay-card">
+        <div class="ton-pay-row" data-copy-target="tonPayAddress">
+          <div class="ton-pay-label">Адрес получателя</div>
+          <div class="ton-pay-value" id="tonPayAddress"></div>
+          <div class="ton-pay-hint">Нажмите, чтобы скопировать</div>
+        </div>
+        <div class="ton-pay-row" data-copy-target="tonPayAmount">
+          <div class="ton-pay-label">Сумма к отправке</div>
+          <div class="ton-pay-value ton-pay-big" id="tonPayAmount"></div>
+          <div class="ton-pay-hint">Нажмите, чтобы скопировать</div>
+        </div>
+        <div class="ton-pay-row" data-copy-target="tonPayComment">
+          <div class="ton-pay-label">Комментарий (обязательно)</div>
+          <div class="ton-pay-value" id="tonPayComment"></div>
+          <div class="ton-pay-hint">Нажмите, чтобы скопировать</div>
+        </div>
+      </div>
+
+      <div class="note-box" style="margin-top:12px;">
+        💎 Без комиссии. Пополнение в течение часа после поступления перевода. Сеть — только <strong>TON</strong>, валюта — <strong>USDT</strong>.
+      </div>
+
+      <button class="btn-primary" id="tonPayOpenBtn">Перейти в Tonkeeper</button>
+      <button class="btn-secondary" id="tonPaySentBtn" style="width:100%; margin-top:10px; padding:14px;">Отправил</button>
+
+      <div class="note-box" id="tonPayDone" style="display:none; margin-top:12px; border-style:solid;">
+        ✅ Спасибо! Ждём поступление перевода — баланс пополнится в течение часа. Если средства не пришли, напишите нам:
+        <a href="#" id="tonPayManagerLink" style="color:var(--accent-2); text-decoration:underline;">@Manager_KitsaiGG</a>
+      </div>
+    </section>
+
     <section class="view" data-view="topup">
       <!-- Плашка с инструкциями по ручному/автопополнению временно убрана по просьбе — см. содержимое ниже, легко вернуть обратно.
       <div class="warning-box" style="margin-top:2px;">
@@ -1506,14 +1552,13 @@
       </div>
       -->
 
-      <div class="topup-promo-banner" id="topupTonBanner">
-        <h4>💎 Пополнение без комиссии</h4>
-        <p>Доступно пополнение через <strong>Tonkeeper</strong> в <strong>USDT (TON)</strong> — без комиссии, на любую сумму.</p>
-        <p class="tpb-cta" id="topupTonCta" style="cursor:pointer;">Для такого пополнения напишите нам → @Manager_KitsaiGG</p>
-      </div>
-
       <div class="section-label" style="margin-top:0;">Способ оплаты</div>
       <div class="method-grid" id="topupMethods">
+        <div class="method-card" data-method="ton" style="grid-column:1 / -1;">
+          <div class="method-name">USDT ( TON )</div>
+          <div class="method-fee">Без комиссии</div>
+          <div class="method-fee">Пополнение в течение часа</div>
+        </div>
         <div class="method-card" data-method="cryptobot">
           <div class="method-name">CryptoBot</div>
           <div class="method-fee">Комиссия 4%</div>
@@ -1675,6 +1720,20 @@ const GROUP_TITLES = {
 };
 
 const TOPUP_AMOUNTS = [1,5,10,25,50,100];
+// ---- Пополнение через Tonkeeper (USDT в сети TON) ----
+const TON_RECEIVER_ADDRESS = 'UQAuVEI2mpXC84tvluB5NpfKb624-9CPjQC0b2y07CulN3uE';
+// Мастер-контракт USDT в сети TON (официальный Tether jetton).
+const TON_USDT_JETTON = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
+const TON_MIN_USDT = 1;
+function tonComment(){ return 'KitsaiGG-' + state.telegramId; } // по нему определяем, кому зачислить
+function buildTonkeeperLink(amountUsdt){
+  const units = Math.round(amountUsdt * 1e6); // у USDT 6 знаков после запятой
+  return 'https://app.tonkeeper.com/transfer/' + TON_RECEIVER_ADDRESS +
+    '?amount=' + units +
+    '&jetton=' + TON_USDT_JETTON +
+    '&text=' + encodeURIComponent(tonComment());
+}
+
 
 // Курс $ → ₽ для отображения суммы к оплате через Antilopay (СБП). Только для UI.
 const ANTILOPAY_USD_RUB_RATE = 89;
@@ -1697,6 +1756,8 @@ const ANTILOPAY_MIN_ACCOUNT_AGE_HOURS = 72;
 // которая зачислится на баланс (см. комментарий в confirmTopup). functionName —
 // какую Supabase Edge Function дёргать при подтверждении.
 const PAYMENT_METHODS = {
+  // Ручное пополнение USDT (TON) через Tonkeeper — без комиссии, без Edge Function (см. openTonPay).
+  ton:       { functionName: null,                     feeRate: 0 },
   cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
   lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
   // Эквайринг Antilopay (карта / СБП). Комиссию 3% добавляет сам банк-эквайринг на своей странице оплаты,
@@ -2973,7 +3034,8 @@ function viewTitle(v){
     'item-detail': state.currentListItem?.title || '',
     'checkout': 'Подтверждение заказа',
     'order-detail': 'Чек заказа',
-    'topup': 'Пополнение баланса'
+    'topup': 'Пополнение баланса',
+    'ton-pay': 'Пополнение USDT (TON)'
   };
   return map[v] || '';
 }
@@ -4582,12 +4644,14 @@ function updateTopupBtn(){
     btn.classList.add('disabled');
     feeNote.style.display = 'none';
   } else if(state.topupAmount && state.topupAmount > 0){
-    btn.textContent = 'Пополнить баланс';
+    btn.textContent = state.topupMethod === 'ton' ? 'Продолжить' : 'Пополнить баланс';
     btn.classList.remove('disabled');
 
     const feeRate = PAYMENT_METHODS[state.topupMethod].feeRate;
     const totalDue = round2(state.topupAmount * (1 + feeRate));
-    if(state.topupMethod === 'antilopay'){
+    if(state.topupMethod === 'ton'){
+      feeNote.textContent = `К отправке ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} USDT, без комиссии`;
+    } else if(state.topupMethod === 'antilopay'){
       // СБП: показываем сумму в рублях (с комиссией) по курсу ANTILOPAY_USD_RUB_RATE
       // Эквайринг удерживает комиссию из общей суммы платежа, поэтому делим на (1 - комиссия), а не умножаем на (1 + комиссия)
       const totalRub = round2(state.topupAmount * ANTILOPAY_USD_RUB_RATE / (1 - ANTILOPAY_ACQUIRING_FEE));
@@ -4613,6 +4677,11 @@ async function confirmTopup(){
 
   const btn = document.getElementById('topupBtn');
   if(btn.classList.contains('disabled')) return;
+
+  if(state.topupMethod === 'ton'){
+    openTonPay();
+    return;
+  }
 
   if(state.topupMethod === 'antilopay' && state.topupAmount < ANTILOPAY_MIN_AMOUNT_USD){
     showToast(`Минимальная сумма для СБП — ${ANTILOPAY_MIN_AMOUNT_USD.toString().replace('.', ',')}$`);
@@ -4890,6 +4959,27 @@ function openTopup(){
   pushView('topup', {sub:true, title:'Пополнение баланса'});
 }
 
+/* ---------------- TON PAY (пополнение USDT через Tonkeeper) ---------------- */
+function openTonPay(){
+  const amount = round2(state.topupAmount);
+  if(!amount || amount < TON_MIN_USDT){
+    showToast(`Минимальная сумма — ${TON_MIN_USDT} USDT`);
+    return;
+  }
+  if(!state.telegramId){
+    showToast('Откройте приложение через Telegram-бота, чтобы пополнить баланс');
+    return;
+  }
+  const amountStr = String(amount);
+  document.getElementById('tonPayAddress').textContent = TON_RECEIVER_ADDRESS;
+  document.getElementById('tonPayAmount').textContent = amountStr + ' USDT';
+  document.getElementById('tonPayAmount').dataset.copy = amountStr;
+  document.getElementById('tonPayComment').textContent = tonComment();
+  document.getElementById('tonPaySentBtn').style.display = '';
+  document.getElementById('tonPayDone').style.display = 'none';
+  pushView('ton-pay', {sub:true, title:'Пополнение USDT (TON)'});
+}
+
 /* ---------------- TOAST ---------------- */
 let toastTimer;
 function showToast(msg){
@@ -5043,8 +5133,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     openExternalLink('https://t.me/Manager_KitsaiGG');
   });
-  // Плашка «пополнение без комиссии через Tonkeeper» на экране пополнения
-  document.getElementById('topupTonCta')?.addEventListener('click', () => openExternalLink('https://t.me/Manager_KitsaiGG'));
+  // Страница оплаты USDT (TON): копирование по тапу, переход в Tonkeeper, «Отправил»
+  document.querySelectorAll('#tonPayAddress, #tonPayAmount, #tonPayComment').forEach(el => {
+    el.closest('.ton-pay-row').addEventListener('click', () => {
+      copyToClipboard(el.dataset.copy || el.textContent, 'Скопировано');
+    });
+  });
+  document.getElementById('tonPayOpenBtn').addEventListener('click', () => {
+    openExternalLink(buildTonkeeperLink(parseFloat(document.getElementById('tonPayAmount').dataset.copy)));
+  });
+  document.getElementById('tonPaySentBtn').addEventListener('click', () => {
+    document.getElementById('tonPaySentBtn').style.display = 'none';
+    document.getElementById('tonPayDone').style.display = 'block';
+  });
+  document.getElementById('tonPayManagerLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    openExternalLink('https://t.me/Manager_KitsaiGG');
+  });
   document.getElementById('linkTerms').addEventListener('click', () => pushView('terms', {sub:true, title:'Пользовательское соглашение'}));
   document.getElementById('linkPrivacy').addEventListener('click', () => pushView('privacy', {sub:true, title:'Политика конфиденциальности'}));
   document.getElementById('linkRefundPolicy').addEventListener('click', () => pushView('refund-policy', {sub:true, title:'Политика возвратов'}));
