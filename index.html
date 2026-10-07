@@ -1578,7 +1578,7 @@
       <div class="chip-grid" id="topupChips"></div>
       <div class="field">
         <label>Или введите свою сумму ($)</label>
-        <input type="number" id="topupCustom" placeholder="0 $" min="0.5" step="0.01">
+        <input type="number" id="topupCustom" placeholder="0 $" min="0.1" step="0.01">
       </div>
 
       <div id="topupFeeNote" style="display:none; font-size:12.5px; color:var(--text-muted); margin-top:10px; text-align:center;"></div>
@@ -1724,7 +1724,7 @@ const TOPUP_AMOUNTS = [1,5,10,25,50,100];
 const TON_RECEIVER_ADDRESS = 'UQAuVEI2mpXC84tvluB5NpfKb624-9CPjQC0b2y07CulN3uE';
 // Мастер-контракт USDT в сети TON (официальный Tether jetton).
 const TON_USDT_JETTON = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
-const TON_MIN_USDT = 1;
+const TON_MIN_USDT = 0.1;
 // Комментарий случайный (10 символов), его выдаёт сервер: edge-функция ton-topup
 // создаёт заявку в таблице ton_topups и привязывает комментарий к клиенту.
 const TON_TOPUP_FUNCTION = 'ton-topup';
