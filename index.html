@@ -1523,7 +1523,7 @@
       <button class="btn-secondary" id="tonPaySentBtn" style="width:100%; margin-top:10px; padding:14px;">Отправил</button>
 
       <div class="note-box" id="tonPayDone" style="display:none; margin-top:12px; border-style:solid;">
-        ✅ Спасибо! Ждём поступление перевода — баланс пополнится в течение часа. Если средства не пришли, напишите нам:
+        <span id="tonPayDoneText">✅ Спасибо! Ждём поступление перевода — баланс пополнится в течение часа. Если средства не пришли, напишите нам:</span>
         <a href="#" id="tonPayManagerLink" style="color:var(--accent-2); text-decoration:underline;">@Manager_KitsaiGG</a>
       </div>
     </section>
@@ -1725,13 +1725,15 @@ const TON_RECEIVER_ADDRESS = 'UQAuVEI2mpXC84tvluB5NpfKb624-9CPjQC0b2y07CulN3uE';
 // Мастер-контракт USDT в сети TON (официальный Tether jetton).
 const TON_USDT_JETTON = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
 const TON_MIN_USDT = 1;
-function tonComment(){ return 'KitsaiGG-' + state.telegramId; } // по нему определяем, кому зачислить
-function buildTonkeeperLink(amountUsdt){
+// Комментарий случайный (10 символов), его выдаёт сервер: edge-функция ton-topup
+// создаёт заявку в таблице ton_topups и привязывает комментарий к клиенту.
+const TON_TOPUP_FUNCTION = 'ton-topup';
+function buildTonkeeperLink(amountUsdt, comment){
   const units = Math.round(amountUsdt * 1e6); // у USDT 6 знаков после запятой
   return 'https://app.tonkeeper.com/transfer/' + TON_RECEIVER_ADDRESS +
     '?amount=' + units +
     '&jetton=' + TON_USDT_JETTON +
-    '&text=' + encodeURIComponent(tonComment());
+    '&text=' + encodeURIComponent(comment);
 }
 
 
@@ -1756,7 +1758,7 @@ const ANTILOPAY_MIN_ACCOUNT_AGE_HOURS = 72;
 // которая зачислится на баланс (см. комментарий в confirmTopup). functionName —
 // какую Supabase Edge Function дёргать при подтверждении.
 const PAYMENT_METHODS = {
-  // Ручное пополнение USDT (TON) через Tonkeeper — без комиссии, без Edge Function (см. openTonPay).
+  // Ручное пополнение USDT (TON) через Tonkeeper — без комиссии. Счёт создаётся не через confirmTopup, а в openTonPay (функция ton-topup).
   ton:       { functionName: null,                     feeRate: 0 },
   cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
   lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
@@ -4960,7 +4962,9 @@ function openTopup(){
 }
 
 /* ---------------- TON PAY (пополнение USDT через Tonkeeper) ---------------- */
-function openTonPay(){
+let tonPayBusy = false;
+async function openTonPay(){
+  if(tonPayBusy) return;
   const amount = round2(state.topupAmount);
   if(!amount || amount < TON_MIN_USDT){
     showToast(`Минимальная сумма — ${TON_MIN_USDT} USDT`);
@@ -4970,14 +4974,101 @@ function openTonPay(){
     showToast('Откройте приложение через Telegram-бота, чтобы пополнить баланс');
     return;
   }
-  const amountStr = String(amount);
-  document.getElementById('tonPayAddress').textContent = TON_RECEIVER_ADDRESS;
-  document.getElementById('tonPayAmount').textContent = amountStr + ' USDT';
-  document.getElementById('tonPayAmount').dataset.copy = amountStr;
-  document.getElementById('tonPayComment').textContent = tonComment();
-  document.getElementById('tonPaySentBtn').style.display = '';
-  document.getElementById('tonPayDone').style.display = 'none';
-  pushView('ton-pay', {sub:true, title:'Пополнение USDT (TON)'});
+  if(!supabaseClient){
+    showToast('Supabase не настроен — впишите SUPABASE_URL и ключ в коде');
+    return;
+  }
+
+  tonPayBusy = true;
+  const btn = document.getElementById('topupBtn');
+  btn.textContent = 'Создаём заявку...';
+  btn.classList.add('disabled');
+  try {
+    const initData = await waitForTelegramInitData();
+    if(!initData){
+      showToast('Откройте приложение через Telegram-бота, чтобы пополнить баланс');
+      return;
+    }
+    const { data, error } = await supabaseClient.functions.invoke(TON_TOPUP_FUNCTION, {
+      body: { action: 'create', init_data: initData, amount_usd: amount }
+    });
+    if(error || data?.error || !data?.id || !data?.comment){
+      const messages = {
+        bad_amount: `Минимальная сумма — ${TON_MIN_USDT} USDT`,
+        unauthorized: 'Не удалось подтвердить пользователя Telegram',
+        banned: 'Аккаунт заблокирован. Обратитесь в поддержку',
+        profile_not_found: 'Профиль не найден. Откройте бота и нажмите /start',
+        too_many_pending: 'У вас уже есть заявки на проверке. Дождитесь зачисления',
+        too_many_attempts: 'Слишком много попыток. Попробуйте позже или напишите в поддержку',
+        db_error: 'Не удалось создать заявку. Попробуйте ещё раз'
+      };
+      showToast(messages[data?.error] || 'Не удалось создать заявку. Попробуйте ещё раз');
+      return;
+    }
+
+    // Сумму берём из ответа сервера: она же уйдёт в карточку для админа
+    const amountStr = String(Number(data.amount_usd) || amount);
+    state.tonTopup = { id: data.id, comment: data.comment, amount: Number(amountStr) };
+    document.getElementById('tonPayAddress').textContent = TON_RECEIVER_ADDRESS;
+    document.getElementById('tonPayAmount').textContent = amountStr + ' USDT';
+    document.getElementById('tonPayAmount').dataset.copy = amountStr;
+    document.getElementById('tonPayComment').textContent = data.comment;
+    document.getElementById('tonPayComment').dataset.copy = data.comment;
+    const sentBtn = document.getElementById('tonPaySentBtn');
+    sentBtn.style.display = '';
+    sentBtn.disabled = false;
+    sentBtn.textContent = 'Отправил';
+    document.getElementById('tonPayDone').style.display = 'none';
+    pushView('ton-pay', {sub:true, title:'Пополнение USDT (TON)'});
+  } catch(e){
+    console.error('ton-topup create error:', e);
+    showToast('Не удалось создать заявку. Попробуйте ещё раз');
+  } finally {
+    tonPayBusy = false;
+    updateTopupBtn();
+  }
+}
+
+async function sendTonPaid(){
+  const t = state.tonTopup;
+  if(!t || !t.id){
+    showToast('Заявка не найдена. Вернитесь назад и создайте её заново');
+    return;
+  }
+  const sentBtn = document.getElementById('tonPaySentBtn');
+  if(sentBtn.disabled) return;
+  sentBtn.disabled = true;
+  sentBtn.textContent = 'Отправляем...';
+  try {
+    const initData = await waitForTelegramInitData();
+    if(!initData){
+      showToast('Откройте приложение через Telegram-бота');
+      sentBtn.disabled = false;
+      sentBtn.textContent = 'Отправил';
+      return;
+    }
+    const { data, error } = await supabaseClient.functions.invoke(TON_TOPUP_FUNCTION, {
+      body: { action: 'sent', init_data: initData, topup_id: t.id }
+    });
+    if(error || data?.error || !data?.ok){
+      showToast(data?.error === 'not_found'
+        ? 'Заявка не найдена. Вернитесь назад и создайте её заново'
+        : 'Не удалось отправить. Попробуйте ещё раз');
+      sentBtn.disabled = false;
+      sentBtn.textContent = 'Отправил';
+      return;
+    }
+    document.getElementById('tonPayDoneText').textContent = data.notified === false
+      ? '✅ Отметили. Не удалось автоматически уведомить менеджера, поэтому напишите ему сами, чтобы ускорить зачисление:'
+      : '✅ Спасибо! Ждём поступление перевода — баланс пополнится в течение часа. Если средства не пришли, напишите нам:';
+    sentBtn.style.display = 'none';
+    document.getElementById('tonPayDone').style.display = 'block';
+  } catch(e){
+    console.error('ton-topup sent error:', e);
+    showToast('Не удалось отправить. Попробуйте ещё раз');
+    sentBtn.disabled = false;
+    sentBtn.textContent = 'Отправил';
+  }
 }
 
 /* ---------------- TOAST ---------------- */
@@ -5140,12 +5231,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.getElementById('tonPayOpenBtn').addEventListener('click', () => {
-    openExternalLink(buildTonkeeperLink(parseFloat(document.getElementById('tonPayAmount').dataset.copy)));
+    const t = state.tonTopup;
+    if(!t || !t.comment){
+      showToast('Заявка не найдена. Вернитесь назад и создайте её заново');
+      return;
+    }
+    openExternalLink(buildTonkeeperLink(t.amount, t.comment));
   });
-  document.getElementById('tonPaySentBtn').addEventListener('click', () => {
-    document.getElementById('tonPaySentBtn').style.display = 'none';
-    document.getElementById('tonPayDone').style.display = 'block';
-  });
+  document.getElementById('tonPaySentBtn').addEventListener('click', sendTonPaid);
   document.getElementById('tonPayManagerLink').addEventListener('click', (e) => {
     e.preventDefault();
     openExternalLink('https://t.me/Manager_KitsaiGG');
