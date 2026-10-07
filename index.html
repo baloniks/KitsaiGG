@@ -798,6 +798,38 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
   ::-webkit-scrollbar{display:none;}
+
+  /* ---------- Приглашение подписаться на канал (первый заход) ---------- */
+  .sub-overlay{
+    position:fixed; inset:0; z-index:200; display:none;
+    align-items:center; justify-content:center; padding:20px;
+    background:rgba(5,6,10,.78); backdrop-filter:blur(6px);
+  }
+  .sub-overlay.show{display:flex; animation:subFade .25s ease;}
+  @keyframes subFade{from{opacity:0}to{opacity:1}}
+  .sub-card{
+    width:100%; max-width:340px; text-align:center; padding:28px 22px 18px;
+    border-radius:24px; background:linear-gradient(160deg, rgba(24,68,192,.25), var(--surface) 60%);
+    border:1px solid rgba(24,68,192,.35); box-shadow:var(--shadow-lift);
+  }
+  .sub-icon{
+    width:64px; height:64px; margin:0 auto 14px; border-radius:50%;
+    background:var(--grad-brand); display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 20px rgba(24,68,192,.5);
+  }
+  .sub-icon svg{width:30px; height:30px; fill:#fff;}
+  .sub-card h2{font-family:var(--font-display); font-size:20px; font-weight:600; line-height:1.25;}
+  .sub-card p{font-size:13px; color:var(--text-muted); margin-top:8px; line-height:1.45;}
+  .sub-btn{
+    display:block; width:100%; margin-top:20px; padding:14px; border:0; border-radius:14px;
+    background:var(--grad-brand); color:#fff; font-family:var(--font-body); font-weight:600; font-size:15px;
+    cursor:pointer; transition:transform .12s;
+  }
+  .sub-btn:active{transform:scale(.97);}
+  .sub-skip{
+    display:block; width:100%; margin-top:6px; padding:12px; border:0; background:none;
+    color:var(--text-faint); font-family:var(--font-body); font-size:13px; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -1517,6 +1549,15 @@
     </div>
   </nav>
 
+  <div class="sub-overlay" id="subOverlay" role="dialog" aria-modal="true">
+    <div class="sub-card">
+      <div class="sub-icon"><svg viewBox="0 0 24 24"><path d="M9.8 15.6l-.4 4.1c.6 0 .8-.3 1.2-.6l2.8-2.6 5.8 4.2c1.1.6 1.8.3 2.1-1l3.8-17.8c.4-1.6-.6-2.2-1.6-1.8L1.2 10.6c-1.5.6-1.5 1.5-.3 1.9l5.6 1.7 13-8.2c.6-.4 1.2-.2.7.2z"/></svg></div>
+      <h2>Подпишись на наш канал</h2>
+      <p>Новости, акции и промокоды — первыми узнаёшь в Telegram-канале KitsaiGG.</p>
+      <button class="sub-btn" id="subJoin">Подписаться</button>
+      <button class="sub-skip" id="subSkip">Не сейчас</button>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 </div>
 
@@ -5099,6 +5140,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadReferralStats(); // подтягиваем статистику по рефералам (после того как loadBalance вызвал upsert_profile_with_referral и зафиксировал referred_by)
   loadOrders(); // подтягиваем историю заказов, чтобы сразу показать баннер "оставить отзыв", если есть недавний выполненный заказ
 });
+</script>
+<script>
+(function(){
+  var CHANNEL_URL = 'https://t.me/KitsaiGG';
+  var KEY = 'kitsaigg_channel_prompt_seen';
+  var overlay = document.getElementById('subOverlay');
+  if (!overlay) return;
+
+  var seen = false;
+  try { seen = localStorage.getItem(KEY) === '1'; } catch (e) {}
+  if (seen) return;
+
+  function markSeen(){ try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+  function close(){ overlay.classList.remove('show'); }
+
+  document.getElementById('subJoin').addEventListener('click', function(){
+    markSeen(); close();
+    if (typeof openExternalLink === 'function') openExternalLink(CHANNEL_URL);
+    else window.location.assign(CHANNEL_URL);
+  });
+  document.getElementById('subSkip').addEventListener('click', function(){
+    markSeen(); close();
+  });
+
+  overlay.classList.add('show');
+})();
 </script>
 </body>
 </html>
