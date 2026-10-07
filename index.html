@@ -1506,6 +1506,12 @@
       </div>
       -->
 
+      <div class="topup-promo-banner" id="topupTonBanner">
+        <h4>💎 Пополнение без комиссии</h4>
+        <p>Доступно пополнение через <strong>Tonkeeper</strong> в <strong>USDT (TON)</strong> — без комиссии, на любую сумму.</p>
+        <p class="tpb-cta" id="topupTonCta" style="cursor:pointer;">Для такого пополнения напишите нам → @Manager_KitsaiGG</p>
+      </div>
+
       <div class="section-label" style="margin-top:0;">Способ оплаты</div>
       <div class="method-grid" id="topupMethods">
         <div class="method-card" data-method="cryptobot">
@@ -5037,6 +5043,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     openExternalLink('https://t.me/Manager_KitsaiGG');
   });
+  // Плашка «пополнение без комиссии через Tonkeeper» на экране пополнения
+  document.getElementById('topupTonCta')?.addEventListener('click', () => openExternalLink('https://t.me/Manager_KitsaiGG'));
   document.getElementById('linkTerms').addEventListener('click', () => pushView('terms', {sub:true, title:'Пользовательское соглашение'}));
   document.getElementById('linkPrivacy').addEventListener('click', () => pushView('privacy', {sub:true, title:'Политика конфиденциальности'}));
   document.getElementById('linkRefundPolicy').addEventListener('click', () => pushView('refund-policy', {sub:true, title:'Политика возвратов'}));
