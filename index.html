@@ -1561,11 +1561,11 @@
         </div>
         <div class="method-card" data-method="cryptobot">
           <div class="method-name">CryptoBot</div>
-          <div class="method-fee">Комиссия 4%</div>
+          <div class="method-fee">Комиссия 3.5%</div>
         </div>
         <div class="method-card" data-method="lavepay">
           <div class="method-name">Lave Pay</div>
-          <div class="method-fee">Комиссия 2%</div>
+          <div class="method-fee">Комиссия 1.4%</div>
         </div>
         <div class="method-card" data-method="antilopay" style="grid-column:1 / -1;">
           <div class="method-name">Antilopay ( СБП )</div>
@@ -1760,8 +1760,8 @@ const ANTILOPAY_MIN_ACCOUNT_AGE_HOURS = 72;
 const PAYMENT_METHODS = {
   // Ручное пополнение USDT (TON) через Tonkeeper — без комиссии. Счёт создаётся не через confirmTopup, а в openTonPay (функция ton-topup).
   ton:       { functionName: null,                     feeRate: 0 },
-  cryptobot: { functionName: 'create-invoice',         feeRate: 0.04 },
-  lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.02 },
+  cryptobot: { functionName: 'create-invoice',         feeRate: 0.035 },
+  lavepay:   { functionName: 'create-lavepay-invoice',  feeRate: 0.014 },
   // Эквайринг Antilopay (карта / СБП). Комиссию 3% добавляет сам банк-эквайринг на своей странице оплаты,
   // поэтому наша наценка = 0 (см. ANTILOPAY_ACQUIRING_FEE — она нужна только для показа суммы в рублях).
   antilopay: { functionName: 'create-antilopay-invoice', feeRate: 0 },
