@@ -1516,14 +1516,14 @@
       </div>
 
       <div class="note-box" style="margin-top:12px;">
-        💎 Без комиссии. Пополнение в течение часа после поступления перевода. Сеть — только <strong>TON</strong>, валюта — <strong>USDT</strong>.
+        ⚡ Пополнение автоматическое и без комиссии: после перевода нажмите «Отправил», и баланс пополнится в течение 1–2 минут. Сеть — только <strong>TON</strong>, валюта — <strong>USDT</strong>.
       </div>
 
       <button class="btn-primary" id="tonPayOpenBtn">Перейти в Tonkeeper</button>
       <button class="btn-secondary" id="tonPaySentBtn" style="width:100%; margin-top:10px; padding:14px;">Отправил</button>
 
       <div class="note-box" id="tonPayDone" style="display:none; margin-top:12px; border-style:solid;">
-        <span id="tonPayDoneText">✅ Спасибо! Ждём поступление перевода — баланс пополнится в течение часа. Если средства не пришли, напишите нам:</span>
+        <span id="tonPayDoneText">✅ Платёж проверяется автоматически — баланс пополнится в течение 1–2 минут. Если через 10 минут баланс не изменился, напишите нам:</span>
         <a href="#" id="tonPayManagerLink" style="color:var(--accent-2); text-decoration:underline;">@Manager_KitsaiGG</a>
       </div>
     </section>
@@ -1557,7 +1557,7 @@
         <div class="method-card" data-method="ton" style="grid-column:1 / -1;">
           <div class="method-name">USDT ( TON )</div>
           <div class="method-fee">Без комиссии</div>
-          <div class="method-fee">Пополнение в течение часа</div>
+          <div class="method-fee">Автоматически, 1–2 минуты</div>
         </div>
         <div class="method-card" data-method="cryptobot">
           <div class="method-name">CryptoBot</div>
@@ -5058,9 +5058,8 @@ async function sendTonPaid(){
       sentBtn.textContent = 'Отправил';
       return;
     }
-    document.getElementById('tonPayDoneText').textContent = data.notified === false
-      ? '✅ Отметили. Не удалось автоматически уведомить менеджера, поэтому напишите ему сами, чтобы ускорить зачисление:'
-      : '✅ Спасибо! Ждём поступление перевода — баланс пополнится в течение часа. Если средства не пришли, напишите нам:';
+    document.getElementById('tonPayDoneText').textContent =
+      '✅ Платёж проверяется автоматически — баланс пополнится в течение 1–2 минут. Если через 10 минут баланс не изменился, напишите нам:';
     sentBtn.style.display = 'none';
     document.getElementById('tonPayDone').style.display = 'block';
   } catch(e){
