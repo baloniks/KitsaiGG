@@ -1583,6 +1583,12 @@
 
       <div id="topupFeeNote" style="display:none; font-size:12.5px; color:var(--text-muted); margin-top:10px; text-align:center;"></div>
       <button class="btn-primary disabled" id="topupBtn">Выберите сумму</button>
+
+      <div id="tonRecent" style="display:none; margin-top:24px;">
+        <div class="section-label" style="margin-top:0;">Недавние пополнения USDT (TON)</div>
+        <div id="tonRecentList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:8px; text-align:center;">История хранится 1 час</div>
+      </div>
     </section>
 
   </main>
@@ -4959,6 +4965,96 @@ function openTopup(){
   updateTopupBtn();
   updateAntilopayLock(); // перерисовать карточку Antilopay по уже известному accountCreatedAt
   pushView('topup', {sub:true, title:'Пополнение баланса'});
+  loadTonRecent();
+}
+
+/* ---------------- НЕДАВНИЕ ПОПОЛНЕНИЯ TON (хранятся 1 час) ---------------- */
+const TON_STATUS_LABEL = {
+  created: 'Ожидает оплаты',
+  sent: 'Проверяется',
+  credited: 'Зачислено',
+  rejected: 'Отклонено'
+};
+const TON_STATUS_COLOR = {
+  created: 'var(--gold)',
+  sent: 'var(--accent-2)',
+  credited: 'var(--green)',
+  rejected: 'var(--danger)'
+};
+
+function showTonPayView(t){
+  state.tonTopup = { id: t.id, comment: t.comment, amount: Number(t.amount) };
+  const amountStr = String(Number(t.amount));
+  document.getElementById('tonPayAddress').textContent = TON_RECEIVER_ADDRESS;
+  document.getElementById('tonPayAmount').textContent = amountStr + ' USDT';
+  document.getElementById('tonPayAmount').dataset.copy = amountStr;
+  document.getElementById('tonPayComment').textContent = t.comment;
+  document.getElementById('tonPayComment').dataset.copy = t.comment;
+  const sentBtn = document.getElementById('tonPaySentBtn');
+  sentBtn.style.display = '';
+  sentBtn.disabled = false;
+  sentBtn.textContent = 'Отправил';
+  document.getElementById('tonPayDone').style.display = 'none';
+  pushView('ton-pay', {sub:true, title:'Пополнение USDT (TON)'});
+}
+
+async function loadTonRecent(){
+  const box = document.getElementById('tonRecent');
+  const list = document.getElementById('tonRecentList');
+  if(!box || !list) return;
+  if(!state.telegramId || !supabaseClient){ box.style.display = 'none'; return; }
+  try {
+    const initData = await waitForTelegramInitData();
+    if(!initData){ box.style.display = 'none'; return; }
+    const { data, error } = await supabaseClient.functions.invoke(TON_TOPUP_FUNCTION, {
+      body: { action: 'list', init_data: initData }
+    });
+    if(error || !data?.ok || !Array.isArray(data.items) || !data.items.length){
+      box.style.display = 'none';
+      return;
+    }
+    list.innerHTML = '';
+    data.items.forEach(it => {
+      const row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--border); background:var(--surface); border-radius:var(--radius-sm); padding:12px; display:flex; align-items:center; justify-content:space-between; gap:10px;';
+
+      const left = document.createElement('div');
+      const title = document.createElement('div');
+      title.style.cssText = 'font-weight:600; font-size:14px;';
+      title.textContent = Number(it.amount_usd) + ' USDT';
+      const time = document.createElement('div');
+      time.style.cssText = 'font-size:12px; color:var(--text-muted); margin-top:2px;';
+      time.textContent = new Date(it.created_at).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+      left.appendChild(title);
+      left.appendChild(time);
+
+      const right = document.createElement('div');
+      right.style.cssText = 'text-align:right;';
+      const st = document.createElement('div');
+      st.style.cssText = 'font-size:12.5px; font-weight:600; color:' + (TON_STATUS_COLOR[it.status] || 'var(--text-muted)') + ';';
+      st.textContent = TON_STATUS_LABEL[it.status] || it.status;
+      right.appendChild(st);
+
+      if(it.status === 'created'){
+        const btn = document.createElement('button');
+        btn.className = 'btn-secondary';
+        btn.style.cssText = 'width:auto; margin-top:6px; padding:7px 12px; font-size:12.5px;';
+        btn.textContent = 'Открыть';
+        btn.addEventListener('click', () => showTonPayView({
+          id: it.id, comment: it.comment, amount: it.amount_usd
+        }));
+        right.appendChild(btn);
+      }
+
+      row.appendChild(left);
+      row.appendChild(right);
+      list.appendChild(row);
+    });
+    box.style.display = 'block';
+  } catch(e){
+    console.error('ton recent error:', e);
+    box.style.display = 'none';
+  }
 }
 
 /* ---------------- TON PAY (пополнение USDT через Tonkeeper) ---------------- */
@@ -5062,6 +5158,7 @@ async function sendTonPaid(){
       '✅ Платёж проверяется автоматически — баланс пополнится в течение 1–2 минут. Если через 10 минут баланс не изменился, напишите нам:';
     sentBtn.style.display = 'none';
     document.getElementById('tonPayDone').style.display = 'block';
+    loadTonRecent();
   } catch(e){
     console.error('ton-topup sent error:', e);
     showToast('Не удалось отправить. Попробуйте ещё раз');
