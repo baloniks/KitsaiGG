@@ -5154,8 +5154,17 @@ async function sendTonPaid(){
       sentBtn.textContent = 'Отправил';
       return;
     }
-    document.getElementById('tonPayDoneText').textContent =
-      '✅ Платёж проверяется автоматически — баланс пополнится в течение 1–2 минут. Если через 10 минут баланс не изменился, напишите нам:';
+    let doneMsg;
+    if(data.status === 'credited'){
+      doneMsg = '✅ Эта заявка уже зачислена на ваш баланс. Если баланс не изменился, напишите нам:';
+    } else if(data.status === 'rejected'){
+      doneMsg = '❌ Эта заявка была отклонена. Если вы отправили средства, напишите нам:';
+    } else if(data.notified === false){
+      doneMsg = '⚠️ Платёж проверяется автоматически, но уведомить менеджера не удалось. Если через 5 минут баланс не изменился, напишите нам:';
+    } else {
+      doneMsg = '✅ Платёж проверяется автоматически — баланс пополнится в течение 1–2 минут. Если через 10 минут баланс не изменился, напишите нам:';
+    }
+    document.getElementById('tonPayDoneText').textContent = doneMsg;
     sentBtn.style.display = 'none';
     document.getElementById('tonPayDone').style.display = 'block';
     loadTonRecent();
