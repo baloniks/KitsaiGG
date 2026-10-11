@@ -190,6 +190,8 @@
   .chip .sub{font-size:10px; color:var(--text-faint); margin-top:2px;}
   .chip .sub.stock{font-size:9.5px; opacity:.8;}
   .chip .sub.stock.out{color:#e5484d; opacity:1;}
+  .rate-stock{font-size:12px; color:var(--text-muted); margin:8px 0 2px; text-align:center;}
+  .rate-stock.out{color:#e5484d; font-weight:600;}
   .chip.disabled{opacity:.45; filter:grayscale(1); cursor:not-allowed;}
   .chip.disabled:active{transform:none;}
   .chip.selected{
@@ -918,6 +920,7 @@
           <span class="rate-badge-val" id="rateRateVal">—</span>
         </span>
       </div>
+      <div class="rate-stock" id="rateStock" style="display:none;"></div>
       <div class="related-links" id="rateRelatedLinks" style="display:none;"></div>
       <div class="warning-box" id="rateWarning" style="display:none;"><div class="ico">⚠️</div><div id="rateWarningText"></div></div>
       <div class="chip-grid" id="rateChips"></div>
@@ -2180,6 +2183,8 @@ function buildProductConfigs(rows){
         // колонка rate строки как есть, БЕЗ приоритета rate_usd/price_usd.
         rateRub: baseOverride ? (Number(baseOverride.rate) || 0) : (Number(row.rate) || 0),
         unit: row.unit || '',
+        // Остаток у поставщика (products.stock_info, пишут stock-sync / holdboost-stock-sync)
+        stockInfo: row.stock_info || null,
         glyph: row.glyph || '',
         // Категория товара из Supabase ('games' | 'services') — источник
         // правды для категории заказа в чеке (см. orderCategoryFromProduct
@@ -2424,6 +2429,22 @@ function stockLabelFor(info, i){
   if(n <= 0) return 'Нет в наличии';
   if(n >= 100) return 'В наличии: 100+';
   return 'В наличии: ' + n;
+}
+// Остаток для товара type='rate' (stock_info.variants[0]); null, если данных нет или они старше 3 часов.
+function rateStockN(cfg){
+  const info = cfg && cfg.stockInfo;
+  if(!info || !info.updated_at) return null;
+  if(Date.now() - new Date(info.updated_at).getTime() > 3*60*60*1000) return null;
+  const n = (info.variants || [])[0];
+  return n == null || !Number.isFinite(Number(n)) ? null : Number(n);
+}
+function rateOutOfStock(cfg){ const n = rateStockN(cfg); return n != null && n <= 0; }
+// Максимум количества: меньшее из max_qty товара и остатка у поставщика.
+function rateMaxQty(cfg){
+  let m = cfg.maxQty || Infinity;
+  const n = rateStockN(cfg);
+  if(n != null && n > 0) m = Math.min(m, n);
+  return m;
 }
 async function loadProducts(){
   const wrap = document.getElementById('catalogList');
@@ -3267,6 +3288,13 @@ function renderRateProduct(cat){
   // Бейдж "ЧЕМ БОЛЬШЕ - ТЕМ ВЫГОДНЕЕ" скрываем целиком, если у товара
   // явно выключен show_rate_badge (см. buildProductConfigs).
   document.getElementById('rateBadgeBox').style.display = cfg.showRateBadge ? '' : 'none';
+  const stockEl = document.getElementById('rateStock');
+  const stockText = stockLabelFor(cfg.stockInfo, 0);
+  const rateOut = rateOutOfStock(cfg);
+  const effMax = rateMaxQty(cfg);
+  stockEl.textContent = stockText;
+  stockEl.className = 'rate-stock' + (rateOut ? ' out' : '');
+  stockEl.style.display = stockText ? '' : 'none';
   document.getElementById('rateRateVal').textContent = cfg.tiers && cfg.tiers.length
     // Есть ступенчатые тарифы — показываем все пороги вместо одной цены,
     // например: "2-9 шт: 32.50 $ · от 10 шт: 29.00 $".
@@ -3289,24 +3317,27 @@ function renderRateProduct(cat){
     customInput.value = '';
     customInput.min = cfg.minQty || 1;
     customInput.step = cfg.qtyStep || 1;
-    if(cfg.maxQty) customInput.max = cfg.maxQty; else customInput.removeAttribute('max');
+    customInput.disabled = rateOut;
+    if(Number.isFinite(effMax)) customInput.max = effMax; else customInput.removeAttribute('max');
     document.getElementById('rateCustomLabel').textContent = cfg.qtyLabel
       + (cfg.minQty ? ' (минимум ' + cfg.minQty.toLocaleString('ru-RU') + ' ' + cfg.unit + ')' : ' (' + cfg.unit + ')')
-      + (cfg.maxQty ? ', максимум ' + cfg.maxQty.toLocaleString('ru-RU') : '')
+      + (Number.isFinite(effMax) ? ', максимум ' + effMax.toLocaleString('ru-RU') : '')
       + (cfg.qtyStep > 1 ? ', кратно ' + cfg.qtyStep.toLocaleString('ru-RU') : '');
     updateRateSummary();
     return;
   }
 
   grid.style.display = '';
+  customInput.disabled = rateOut;
   cfg.options
-    .filter(opt => !cfg.maxQty || opt <= cfg.maxQty)
+    .filter(opt => opt <= effMax)
     .forEach(opt => {
     const price = round2(opt * rateForQty(cfg, opt));
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.innerHTML = `<div class="amt">${opt.toLocaleString('ru-RU')} ${cfg.unit}</div><div class="sub">${rub(price)}</div>`;
-    chip.addEventListener('click', () => selectRate(opt, chip));
+    if(rateOut) chip.classList.add('disabled');
+    else chip.addEventListener('click', () => selectRate(opt, chip));
     grid.appendChild(chip);
   });
 
@@ -3315,18 +3346,19 @@ function renderRateProduct(cat){
   customChip.className = 'chip';
   customChip.id = 'rateCustomChip';
   customChip.innerHTML = `<div class="amt">✏️ Своё</div><div class="sub">количество</div>`;
-  customChip.addEventListener('click', () => selectCustomChip(cfg));
+  if(rateOut) customChip.classList.add('disabled');
+  else customChip.addEventListener('click', () => selectCustomChip(cfg));
   grid.appendChild(customChip);
 
   customWrap.style.display = 'none';
   document.getElementById('rateCustomLabel').textContent = 'Своё количество (' + cfg.unit + ')'
     + (cfg.minQty ? ', минимум ' + cfg.minQty.toLocaleString('ru-RU') : '')
-    + (cfg.maxQty ? ', максимум ' + cfg.maxQty.toLocaleString('ru-RU') : '')
+    + (Number.isFinite(effMax) ? ', максимум ' + effMax.toLocaleString('ru-RU') : '')
     + (cfg.qtyStep > 1 ? ', кратно ' + cfg.qtyStep.toLocaleString('ru-RU') : '');
   customInput.value = '';
   customInput.min = cfg.minQty || 1;
   customInput.step = cfg.qtyStep || 1;
-  if(cfg.maxQty) customInput.max = cfg.maxQty; else customInput.removeAttribute('max');
+  if(Number.isFinite(effMax)) customInput.max = effMax; else customInput.removeAttribute('max');
 
   updateRateSummary();
 }
@@ -3358,7 +3390,7 @@ function applyCustomRateInput(cfg){
   const input = document.getElementById('rateCustomInput');
   const val = parseInt(input.value, 10);
   const min = cfg.minQty || 1;
-  const max = cfg.maxQty || Infinity;
+  const max = rateMaxQty(cfg);
   const step = cfg.qtyStep || 1;
   // Кратность шагу считаем от min (а не от нуля), чтобы min не обязательно
   // сам было кратен step — просто следующие значения идут с этим шагом.
@@ -3371,6 +3403,15 @@ function updateRateSummary(){
   const cfg = RATE_CONFIG[state.currentCategory];
   const btn = document.getElementById('rateBuyBtn');
   const totalSubEl = document.getElementById('rateTotalSub');
+  if(rateOutOfStock(cfg)){
+    state.rateSelected = null;
+    document.getElementById('rateQtyVal').textContent = '—';
+    document.getElementById('rateTotalVal').textContent = '— $';
+    if(totalSubEl) totalSubEl.textContent = '— ₽';
+    btn.textContent = 'Нет в наличии';
+    btn.classList.add('disabled');
+    return;
+  }
   if(state.rateSelected == null){
     document.getElementById('rateQtyVal').textContent = '—';
     document.getElementById('rateTotalVal').textContent = '— $';
@@ -3913,6 +3954,7 @@ function attemptBuy(type){
   let purchase;
   if(type === 'rate'){
     if(state.rateSelected == null) return;
+    if(rateOutOfStock(RATE_CONFIG[state.currentCategory])){ showToast('Товара нет в наличии'); return; }
     if(!document.getElementById('rateConsent').checked){ showToast('Отметьте согласие с условиями покупки'); return; }
     const cfg = RATE_CONFIG[state.currentCategory];
     let username = null;
