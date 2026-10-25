@@ -1747,7 +1747,24 @@ function buildTonkeeperLink(amountUsdt, comment){
 
 
 // Курс $ → ₽ для отображения суммы к оплате через Antilopay (СБП). Только для UI.
-const ANTILOPAY_USD_RUB_RATE = 89;
+// Приходит с сервера (RPC antilopay_public_rate): курс Antilopay на вывод + ваша наценка.
+// null — курс сейчас недоступен. Реальная сумма всегда считается на сервере.
+let ANTILOPAY_USD_RUB_RATE = null;
+let antilopayRateLoadedAt = 0;
+async function loadAntilopayRate(force = false){
+  if(!supabaseClient) return;
+  if(!force && ANTILOPAY_USD_RUB_RATE && Date.now() - antilopayRateLoadedAt < 5 * 60 * 1000) return;
+  try{
+    const { data, error } = await supabaseClient.rpc('antilopay_public_rate');
+    const r = Number(data);
+    ANTILOPAY_USD_RUB_RATE = (!error && Number.isFinite(r) && r > 0) ? r : null;
+    antilopayRateLoadedAt = Date.now();
+  }catch(e){
+    console.error('antilopay rate error:', e);
+    ANTILOPAY_USD_RUB_RATE = null;
+  }
+  updateTopupBtn();
+}
 
 // Комиссия эквайринга Antilopay (3%). Удерживается самим банком, мы её не добавляем — только показываем пользователю итоговую сумму в ₽.
 const ANTILOPAY_ACQUIRING_FEE = 0.03;
@@ -4678,6 +4695,7 @@ function selectTopupMethod(method){
   state.topupMethod = method;
   syncTopupMethods();
   updateTopupBtn();
+  if(method === 'antilopay') loadAntilopayRate();
 }
 
 function syncTopupMethods(){
@@ -4704,8 +4722,12 @@ function updateTopupBtn(){
     } else if(state.topupMethod === 'antilopay'){
       // СБП: показываем сумму в рублях (с комиссией) по курсу ANTILOPAY_USD_RUB_RATE
       // Эквайринг удерживает комиссию из общей суммы платежа, поэтому делим на (1 - комиссия), а не умножаем на (1 + комиссия)
-      const totalRub = round2(state.topupAmount * ANTILOPAY_USD_RUB_RATE / (1 - ANTILOPAY_ACQUIRING_FEE));
-      feeNote.textContent = `К оплате ${totalRub.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽`;
+      if(!ANTILOPAY_USD_RUB_RATE){
+        feeNote.textContent = 'Курс обновляется, попробуйте через минуту';
+      } else {
+        const totalRub = round2(state.topupAmount * ANTILOPAY_USD_RUB_RATE / (1 - ANTILOPAY_ACQUIRING_FEE));
+        feeNote.textContent = `К оплате ${totalRub.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})} ₽`;
+      }
     } else {
       feeNote.textContent = `К оплате ${totalDue.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})}$`;
     }
@@ -4785,6 +4807,7 @@ async function confirmTopup(){
         cryptobot_error: 'CryptoBot временно недоступен. Попробуйте позже',
         lavepay_error: 'Lave Pay временно недоступен. Попробуйте позже',
         antilopay_error: 'Оплата картой временно недоступна. Попробуйте позже',
+        rate_unavailable: 'Курс обновляется. Попробуйте через минуту',
         account_too_new: data?.retry_after_hours
           ? `Оплата картой/СБП станет доступна примерно через ${Math.ceil(Number(data.retry_after_hours))} ч после регистрации в боте`
           : 'Оплата картой/СБП пока недоступна для нового аккаунта',
@@ -5006,6 +5029,7 @@ function openTopup(){
   syncTopupMethods();
   updateTopupBtn();
   updateAntilopayLock(); // перерисовать карточку Antilopay по уже известному accountCreatedAt
+  loadAntilopayRate();
   pushView('topup', {sub:true, title:'Пополнение баланса'});
   loadTonRecent();
 }
