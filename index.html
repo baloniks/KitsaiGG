@@ -1573,7 +1573,7 @@
         <div class="method-card" data-method="antilopay" style="grid-column:1 / -1;">
           <div class="method-name">Antilopay ( СБП )</div>
           <div class="method-fee">Оплатить нужно в течение 3 минут</div>
-          <div class="method-fee">Комиссия 3%, Курс $ к рублю 89</div>
+          <div class="method-fee">Комиссия 3%, Курс $ к рублю <span id="antilopayRateLabel">обновляется…</span></div>
         </div>
       </div>
 
@@ -1762,6 +1762,12 @@ async function loadAntilopayRate(force = false){
   }catch(e){
     console.error('antilopay rate error:', e);
     ANTILOPAY_USD_RUB_RATE = null;
+  }
+  const rateLabel = document.getElementById('antilopayRateLabel');
+  if(rateLabel){
+    rateLabel.textContent = ANTILOPAY_USD_RUB_RATE
+      ? ANTILOPAY_USD_RUB_RATE.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2})
+      : 'обновляется…';
   }
   updateTopupBtn();
 }
